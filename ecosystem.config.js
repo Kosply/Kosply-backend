@@ -14,6 +14,9 @@ module.exports = {
       instances: 1,
       exec_mode: 'fork',
       watch: false,
+      autorestart: true,
+      time: true,
+      kill_timeout: 12000,
       max_memory_restart: '300M',
       env: {
         NODE_ENV: 'staging',
@@ -28,6 +31,9 @@ module.exports = {
       instances: 'max',
       exec_mode: 'cluster',
       watch: false,
+      autorestart: true,
+      time: true,
+      kill_timeout: 12000,
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',

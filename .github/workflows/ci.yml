@@ -25,6 +25,7 @@ jobs:
                    lib/server/routes/index.js lib/server/routes/health.route.js \
                    lib/server/controllers/health.controller.js \
                    lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
+                   lib/server/middlewares/asyncHandler.js \
                    ecosystem.config.js; do
             node --check "$f"
           done

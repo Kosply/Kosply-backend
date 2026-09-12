@@ -19,12 +19,12 @@ lib/server/
   config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN)
   routes/               # index.js aggregator + *.route.js per module
   controllers/          # per-module logic (req/res)
-  middlewares/          # notFound (404), errorHandler (central)
+  middlewares/          # notFound (404), errorHandler (central), asyncHandler
 ```
 
 `server.js` binds the port; `app.js` only builds the app (no binding),
 so the app stays importable for tests and PM2 cluster mode stays
-predictable. Error flow: route → controller → `next(err)` →
+predictable. Error flow: route → `asyncHandler` → controller → `next(err)` →
 `errorHandler`; unknown paths fall into `notFound` first.
 
 ## Code documentation
@@ -42,6 +42,8 @@ All files use NatSpec-style docblocks (`@title`, `@notice`, `@dev`,
 
 Resolution order: PM2 `env` → `.env` file → defaults in `config/env.js`
 (dotenv never overrides existing variables, so PM2 always wins).
+`PORT` is strictly validated (digits only, 1-65535); `CORS_ORIGIN` lists are
+trimmed; `app.js` sets `trust proxy: 1` with `1mb` body limits.
 
 ## Run
 
@@ -63,7 +65,7 @@ npm start               # single instance on :3000
 
 ## Adding a new module
 
-1. Create `routes/<name>.route.js` (paths + method wiring only).
+1. Create `routes/<name>.route.js` (paths + method wiring only, wrap handlers with `asyncHandler`).
 2. Create `controllers/<name>.controller.js` (req/res handling only).
 3. Register it in `routes/index.js`:
    `router.use('/<name>', require('./<name>.route'))`.
