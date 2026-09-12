@@ -106,6 +106,24 @@ type pmEntry struct {
 	} `json:"pm2_env"`
 }
 
+// missingStates returns every managed env mapped to "missing".
+func missingStates() map[string]string {
+	states := make(map[string]string, len(Targets()))
+	for _, t := range Targets() {
+		states[t.Env] = "missing"
+	}
+	return states
+}
+
+// envNames returns managed env names for error messages, e.g. "staging|main".
+func envNames() string {
+	names := make([]string, 0, len(Targets()))
+	for _, t := range Targets() {
+		names = append(names, t.Env)
+	}
+	return strings.Join(names, "|")
+}
+
 // States maps every managed env to its PM2 status
 // (online|stopped|stopping|missing). A missing pm2 yields an error.
 func States() (map[string]string, error) {
@@ -114,7 +132,7 @@ func States() (map[string]string, error) {
 		// jlist exits non-zero when the daemon has no processes; treat
 		// empty output as "everything missing" instead of failing.
 		if strings.TrimSpace(out) == "" || strings.TrimSpace(out) == "[]" {
-			return map[string]string{"staging": "missing", "main": "missing"}, nil
+			return missingStates(), nil
 		}
 		return nil, err
 	}
@@ -122,7 +140,7 @@ func States() (map[string]string, error) {
 	if err := json.Unmarshal([]byte(out), &entries); err != nil {
 		return nil, fmt.Errorf("parse pm2 jlist: %w", err)
 	}
-	states := map[string]string{"staging": "missing", "main": "missing"}
+	states := missingStates()
 	for _, t := range Targets() {
 		for _, e := range entries {
 			if e.Name == t.PM2Name {
@@ -134,16 +152,18 @@ func States() (map[string]string, error) {
 }
 
 // ensureRunning starts the target when absent, restarts it when present.
+// A registered-but-stopped process must be restarted (not started),
+// otherwise `pm2 start --only` fails with "already exists".
 func ensureRunning(t Target) error {
 	states, err := States()
 	if err != nil {
 		return err
 	}
-	if states[t.Env] == "online" {
-		_, err := runPM2("restart", t.PM2Name)
+	if states[t.Env] == "missing" {
+		_, err = runPM2("start", "ecosystem.config.js", "--only", t.PM2Name)
 		return err
 	}
-	_, err = runPM2("start", "ecosystem.config.js", "--only", t.PM2Name)
+	_, err = runPM2("restart", t.PM2Name)
 	return err
 }
 
@@ -206,7 +226,7 @@ func StopActive() ([]string, error) {
 		return nil, err
 	}
 	if len(active) == 0 {
-		return nil, fmt.Errorf("no active server (staging and main are both down)")
+		return nil, fmt.Errorf("no active server (%s are all down)", envNames())
 	}
 	stopped := make([]string, 0, len(active))
 	for _, t := range active {
@@ -225,7 +245,7 @@ func RestartActive() ([]string, error) {
 		return nil, err
 	}
 	if len(active) == 0 {
-		return nil, fmt.Errorf("no active server (staging and main are both down)")
+		return nil, fmt.Errorf("no active server (%s are all down)", envNames())
 	}
 	restarted := make([]string, 0, len(active))
 	for _, t := range active {
@@ -247,13 +267,13 @@ func Switch(env string) error {
 	if err := ensureRunning(t); err != nil {
 		return fmt.Errorf("start %s: %w", t.Env, err)
 	}
+	states, err := States()
+	if err != nil {
+		return err
+	}
 	for _, other := range Targets() {
 		if other.Env == t.Env {
 			continue
-		}
-		states, err := States()
-		if err != nil {
-			return err
 		}
 		if states[other.Env] == "online" {
 			if _, err := runPM2("stop", other.PM2Name); err != nil {

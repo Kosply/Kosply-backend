@@ -206,6 +206,7 @@ func printResult(res api.Result) {
 
 // splitFlags separates positional args from --key value / --key=value flags.
 // Single-dash shorthands (-e staging) are supported as well.
+// A flag without a value (or whose next token is another flag) stores "".
 func splitFlags(args []string) (pos []string, flags map[string]string) {
 	flags = map[string]string{}
 	for i := 0; i < len(args); i++ {
@@ -214,7 +215,7 @@ func splitFlags(args []string) (pos []string, flags map[string]string) {
 			kv := strings.SplitN(strings.TrimPrefix(a, "--"), "=", 2)
 			if len(kv) == 2 {
 				flags[kv[0]] = kv[1]
-			} else if i+1 < len(args) {
+			} else if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				flags[kv[0]] = args[i+1]
 				i++
 			} else {
@@ -223,7 +224,7 @@ func splitFlags(args []string) (pos []string, flags map[string]string) {
 			continue
 		}
 		if strings.HasPrefix(a, "-") && len(a) == 2 {
-			if i+1 < len(args) {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				flags[string(a[1])] = args[i+1]
 				i++
 			} else {

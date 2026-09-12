@@ -47,17 +47,26 @@ type Result struct {
 // Call performs a single HTTP request against the given environment.
 // Transport errors are returned; HTTP error statuses are NOT errors so
 // callers can still inspect the status code and body while testing.
+// Only bodyless methods are supported (kosmon is a health-check tool;
+// use curl/Postman for POST/PUT with payloads).
 func Call(env, method, path string) (Result, error) {
 	target, err := config.TargetFor(env)
 	if err != nil {
 		return Result{}, err
+	}
+	m := strings.ToUpper(strings.TrimSpace(method))
+	switch m {
+	case http.MethodGet, http.MethodHead, http.MethodDelete, http.MethodOptions:
+		// supported
+	default:
+		return Result{}, fmt.Errorf("unsupported method %q (want GET|HEAD|DELETE|OPTIONS)", method)
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
 	url := target.BaseURL() + path
 
-	req, err := http.NewRequest(strings.ToUpper(method), url, nil)
+	req, err := http.NewRequest(m, url, nil)
 	if err != nil {
 		return Result{}, fmt.Errorf("build request: %w", err)
 	}
@@ -73,7 +82,7 @@ func Call(env, method, path string) (Result, error) {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	return Result{
 		Env:      target.Env,
-		Method:   strings.ToUpper(method),
+		Method:   m,
 		URL:      url,
 		Status:   resp.StatusCode,
 		Duration: time.Since(start),

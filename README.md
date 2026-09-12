@@ -22,12 +22,13 @@ Kosply-backend/
       config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN)
       routes/               # index.js aggregator + *.route.js per module
       controllers/          # per-module logic (req/res)
-      middlewares/          # notFound, errorHandler
+      middlewares/          # notFound, errorHandler, asyncHandler
+    server-monitoring/      # Go kosmon CLI (test APIs, control PM2)
 ```
 
 Why `lib/server/` instead of `src/`? So `lib/` can later hold sibling runtimes
 (`lib/agent/` for Python, `lib/shared/`, etc.) without refactoring the root.
-Only `server` exists for now.
+Current runtimes: `lib/server/` (Node) + `lib/server-monitoring/` (Go).
 
 ## Code documentation
 All source files use NatSpec-style docblocks (`@title`, `@notice`, `@dev`,
@@ -69,20 +70,26 @@ pm2 status
 | `PORT` | `3000` | `3001` | `3000` |
 | `CORS_ORIGIN` | `*` | `*` | `*` (set the real domain on go-live) |
 
+Notes: `PORT` is strictly validated (digits only, 1-65535, fallback `3000`);
+`CORS_ORIGIN` comma-list is trimmed (`a.com, b.com` works); `app.js` sets
+`trust proxy: 1` and `1mb` body limits.
+
 ## Health check
 - `GET /` → `{ name: kosply-backend, status: ok, env }`
 - `GET /api/health` → `{ status: ok, service, uptime, timestamp }`
 
 ## Adding a new module
-1. Create `lib/server/routes/<name>.route.js`
+1. Create `lib/server/routes/<name>.route.js` (wrap handlers with `asyncHandler` so async throws reach `errorHandler`)
 2. Create `lib/server/controllers/<name>.controller.js`
 3. Register it in `lib/server/routes/index.js`: `router.use('/<name>', require('./<name>.route'))`
 4. Keep controllers thin — extract a `services/` layer once business logic grows.
+5. Mirror new routes in `lib/server-monitoring/internal/api/api.go` `Registry()` so `kosmon list` stays complete.
 
 ## PM2 notes
 - `kosply-server-staging` — `fork`, 1 instance, `:3001`. Playground: test freely, restart anytime.
 - `kosply-server-main` — `cluster` (`instances: max`), `:3000`. Serves real users, never test here directly.
-- `server.js` handles `SIGTERM`/`SIGINT` + `unhandledRejection`, safe for `pm2 restart/reload`.
+- `server.js` handles `SIGTERM`/`SIGINT` + `unhandledRejection`/`uncaughtException` with graceful shutdown, safe for `pm2 restart/reload`.
+- `ecosystem.config.js` sets `kill_timeout: 12000` (covers the 10s graceful window), `autorestart: true`, `time: true`.
 - Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001` → pass → `./scripts/server.sh main restart`.
 
 ## Server monitoring CLI (Go)
@@ -96,7 +103,7 @@ go build -o kosmon .
 
 ./kosmon                                # interactive: ASCII banner + version + menu
 ./kosmon list                           # list all APIs
-./kosmon test /api/health --env staging # call an endpoint
+./kosmon test /api/health --env staging # call an endpoint (methods: GET|HEAD|DELETE|OPTIONS)
 ./kosmon start|stop|restart <staging|main>
 ./kosmon switch main                     # run main, stop staging
 ```
