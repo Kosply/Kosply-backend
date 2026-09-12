@@ -1,0 +1,62 @@
+# Kosply CI: Express server + kosmon CLI + helper scripts.
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+jobs:
+  server:
+    name: Express server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Syntax check (node)
+        run: |
+          for f in lib/server/server.js lib/server/app.js lib/server/config/env.js \
+                   lib/server/routes/index.js lib/server/routes/health.route.js \
+                   lib/server/controllers/health.controller.js \
+                   lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
+                   ecosystem.config.js; do
+            node --check "$f"
+          done
+      - name: Syntax check (shell)
+        run: bash -n scripts/server.sh
+      - name: Smoke test (boot + health)
+        run: |
+          PORT=3100 node lib/server/server.js > /tmp/kosply-smoke.log 2>&1 &
+          SRV=$!
+          sleep 2
+          curl -sf http://localhost:3100/ | grep -q kosply-backend
+          curl -sf http://localhost:3100/api/health | grep -q '"status":"ok"'
+          kill $SRV
+
+  monitor:
+    name: kosmon CLI (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lib/server-monitoring
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: lib/server-monitoring/go.mod
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Build + smoke
+        run: |
+          go build -o kosmon .
+          ./kosmon version
+          ./kosmon list
+          ./kosmon help

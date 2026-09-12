@@ -1,0 +1,27 @@
+name: Question
+description: Ask how something works (setup, PM2, kosmon usage).
+labels: [question]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Question in one line
+      placeholder: How do I point kosmon at a custom project root?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to do? What did you already try?
+      placeholder: |
+        I ran ./kosmon status outside the repo and got
+        "ecosystem.config.js not found".
+    validations:
+      required: true
+  - type: textarea
+    id: docs
+    attributes:
+      label: Docs checked
+      description: Which README/section did you read before asking?
+      placeholder: lib/server-monitoring/README.md — How it works

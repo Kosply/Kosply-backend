@@ -1,0 +1,2 @@
+# Issue chooser: force a template so reports stay complete and triageable.
+blank_issues_enabled: false

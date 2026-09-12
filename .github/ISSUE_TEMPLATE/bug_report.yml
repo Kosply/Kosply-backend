@@ -1,0 +1,54 @@
+name: Bug report
+description: Something broken in staging or live? Tell us how to reproduce it.
+labels: [bug]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One clear sentence describing the bug.
+      placeholder: GET /api/health returns 500 on staging
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environment
+      description: Where did you see it?
+      options:
+        - staging (:3001)
+        - live (:3000)
+        - local dev
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands used (kosmon command, curl, etc.).
+      placeholder: |
+        1. ./scripts/server.sh staging
+        2. ./kosmon test /api/health --env staging
+        3. See 500 in the body
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual vs expected
+      description: What happened, and what should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Paste `pm2 logs`, `kosmon` output, or server stdout.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `./kosmon version` and `node --version`.
+      placeholder: kosmon v0.1.0, node v22.x
