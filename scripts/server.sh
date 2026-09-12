@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # @title Kosply server launcher (single entry)
-# @notice Starts, stops, restarts or shows staging/live through one script.
+# @notice Starts, stops, restarts or shows staging/main through one script.
 # @dev Prefers the kosmon CLI when built (single logic source), otherwise
 # @dev talks to PM2 directly so no Go toolchain is needed to boot a server.
 #
-# Usage: ./scripts/server.sh <staging|live> [start|stop|restart|status]
+# Usage: ./scripts/server.sh <staging|main> [start|stop|restart|status]
 #
 set -euo pipefail
 
@@ -18,12 +18,12 @@ ACTION="${2:-start}"
 KOSMON="$ROOT/lib/server-monitoring/kosmon"
 
 usage() {
-  echo "Usage: ./scripts/server.sh <staging|live> [start|stop|restart|status]"
+  echo "Usage: ./scripts/server.sh <staging|main> [start|stop|restart|status]"
   echo "  ./scripts/server.sh staging           # start staging (:3001)"
-  echo "  ./scripts/server.sh live restart      # restart live (:3000)"
+  echo "  ./scripts/server.sh main restart      # restart main (:3000)"
 }
 
-if [ "$ENV_NAME" != "staging" ] && [ "$ENV_NAME" != "live" ]; then
+if [ "$ENV_NAME" != "staging" ] && [ "$ENV_NAME" != "main" ]; then
   usage >&2
   exit 1
 fi

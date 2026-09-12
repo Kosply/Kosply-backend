@@ -1,6 +1,6 @@
 // Package config is the single source of truth for managed environments.
 // Both the HTTP test client (api) and process control (server) resolve
-// names, ports and URLs here so staging/live can never drift apart.
+// names, ports and URLs here so staging/main can never drift apart.
 package config
 
 import (
@@ -27,7 +27,7 @@ func (t Target) Blurb() string { return fmt.Sprintf("%s on :%d", t.Desc, t.Port)
 func Targets() []Target {
 	return []Target{
 		{Env: "staging", PM2Name: "kosply-server-staging", Port: 3001, Mode: "fork", Desc: "Playground"},
-		{Env: "live", PM2Name: "kosply-server-live", Port: 3000, Mode: "cluster", Desc: "Real users"},
+		{Env: "main", PM2Name: "kosply-server-main", Port: 3000, Mode: "cluster", Desc: "Real users"},
 	}
 }
 
@@ -40,5 +40,5 @@ func TargetFor(env string) (Target, error) {
 			return t, nil
 		}
 	}
-	return Target{}, fmt.Errorf("unknown env %q (want staging|live)", env)
+	return Target{}, fmt.Errorf("unknown env %q (want staging|main)", env)
 }

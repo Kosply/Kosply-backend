@@ -4,7 +4,7 @@
 //
 //	Interactive (default, no args): ASCII banner, version line, then a
 //	numbered menu for listing APIs, testing endpoints and managing the
-//	staging/live processes.
+//	staging/main processes.
 //
 //	Non-interactive: subcommands for scripts and CI, e.g.
 //	kosmon list, kosmon test /api/health --env staging.
@@ -32,16 +32,16 @@ Usage:
   kosmon                              launch interactive menu (default)
   kosmon list                         list all registered APIs
   kosmon test <path> [--env E] [-m M] call an endpoint (default env staging)
-  kosmon start <staging|live>         start a server via PM2
-  kosmon stop [staging|live]          stop one env, or every active server
-  kosmon restart [staging|live]       restart one env, or every active server
+  kosmon start <staging|main>          start a server via PM2
+  kosmon stop [staging|main]          stop one env, or every active server
+  kosmon restart [staging|main]       restart one env, or every active server
   kosmon status                       show PM2 status
-  kosmon switch <staging|live>        run target env, stop the other one
+  kosmon switch <staging|main>        run target env, stop the other one
   kosmon version                      print version
   kosmon help                         print this help
 
 Flags:
-  --env, -e     staging|live   (test command, default staging)
+  --env, -e     staging|main    (test command, default staging)
   --method, -m  HTTP method    (test command, default GET)
 
 Env:
@@ -100,7 +100,7 @@ func cmdList() error {
 func cmdTest(args []string) error {
 	pos, flags := splitFlags(args)
 	if len(pos) == 0 {
-		return fmt.Errorf("usage: kosmon test <path> [--env staging|live] [--method GET]")
+		return fmt.Errorf("usage: kosmon test <path> [--env staging|main] [--method GET]")
 	}
 	env := flagValue(flags, []string{"env", "e"}, "staging")
 	method := flagValue(flags, []string{"method", "m"}, "GET")
@@ -118,7 +118,7 @@ func cmdControl(action string, args []string) error {
 	pos, _ := splitFlags(args)
 	if action == "start" {
 		if len(pos) == 0 {
-			return fmt.Errorf("usage: kosmon start <staging|live>")
+			return fmt.Errorf("usage: kosmon start <staging|main>")
 		}
 		if err := server.Start(pos[0]); err != nil {
 			return err
@@ -157,7 +157,7 @@ func cmdControl(action string, args []string) error {
 func cmdSwitch(args []string) error {
 	pos, _ := splitFlags(args)
 	if len(pos) == 0 {
-		return fmt.Errorf("usage: kosmon switch <staging|live>")
+		return fmt.Errorf("usage: kosmon switch <staging|main>")
 	}
 	if err := server.Switch(pos[0]); err != nil {
 		return err
@@ -166,7 +166,7 @@ func cmdSwitch(args []string) error {
 	return printStates()
 }
 
-// printStates shows staging/live PM2 states in the house style.
+// printStates shows staging/main PM2 states in the house style.
 // Rows that are not online render dimmed so the active servers pop.
 func printStates() error {
 	ui.Header("Server states")
@@ -250,7 +250,7 @@ func flagValue(flags map[string]string, names []string, def string) string {
 // Interactive mode: grouped submenus
 // ---------------------------------------------------------------------------
 
-// mainOptions is the tidy top level: start/stop/restart live under
+// mainOptions is the tidy top level: lifecycle actions sit under
 // "Server control" instead of cluttering the main menu.
 var mainOptions = []ui.Option{
 	{Label: "Server control", Desc: "Start, stop or restart a server"},
@@ -294,7 +294,7 @@ func interactive() {
 func submenuAPI() {
 	opts := []ui.Option{
 		{Label: "List all APIs", Desc: "Show every registered endpoint"},
-		{Label: "Test an API", Desc: "Call an endpoint on staging/live"},
+		{Label: "Test an API", Desc: "Call an endpoint on staging/main"},
 	}
 	for {
 		idx, ok := showMenu("api testing", opts, "back")
@@ -324,7 +324,7 @@ func submenuServer() {
 		{Label: "Stop server", Desc: "Stop every active server"},
 		{Label: "Restart server", Desc: "Restart every active server"},
 		{Label: "Switch environment", Desc: "Run one env, stop the other"},
-		{Label: "Show states", Desc: "Staging/live PM2 states"},
+		{Label: "Show states", Desc: "Staging/main PM2 states"},
 	}
 	for {
 		idx, ok := showMenu("server control", opts, "back")

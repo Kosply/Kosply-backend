@@ -15,7 +15,7 @@
 
 ## Staging evidence (required for runtime changes)
 
-<!-- Paste kosmon output proving staging passes BEFORE live is touched. -->
+<!-- Paste kosmon output proving staging passes BEFORE main is touched. -->
 
 ```text
 $ ./kosmon test /api/health --env staging
@@ -24,7 +24,7 @@ $ ./kosmon test /api/health --env staging
 
 ## Checklist
 
-- [ ] Staging passes (`:3001` green) — live was NOT touched before that
+- [ ] Staging passes (`:3001` green) — main was NOT touched before that
 - [ ] Server: `node --check` clean on touched files
 - [ ] CLI: `gofmt`, `go vet ./...`, `go build` clean
 - [ ] `scripts/server.sh` still works (`bash -n` clean)

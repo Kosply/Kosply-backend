@@ -1,5 +1,5 @@
 // Package api owns the endpoint registry mirrored from lib/server and a
-// small HTTP client used to exercise those endpoints against staging/live.
+// small HTTP client used to exercise those endpoints against staging/main.
 package api
 
 import (

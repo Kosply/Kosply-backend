@@ -34,7 +34,7 @@ All files use NatSpec-style docblocks (`@title`, `@notice`, `@dev`,
 
 ## Env
 
-| Key | Local | Staging (PM2) | Live (PM2) |
+| Key | Local | Staging (PM2) | Main (PM2) |
 |---|---|---|---|
 | `NODE_ENV` | `development` | `staging` | `production` |
 | `PORT` | `3000` | `3001` | `3000` |
@@ -51,9 +51,9 @@ npm run dev             # watch mode on :3000 (.env)
 npm run dev:staging     # staging simulation on :3001
 npm start               # single instance on :3000
 
-# PM2 (recommended) — staging first, live after it passes:
+# PM2 (recommended) — staging first, main after it passes:
 ./scripts/server.sh staging
-./scripts/server.sh live
+./scripts/server.sh main
 ```
 
 ## Endpoints

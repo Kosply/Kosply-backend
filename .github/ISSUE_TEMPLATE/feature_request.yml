@@ -36,12 +36,12 @@ body:
       label: Proposal
       description: How should it work? Commands, flags, menu placement, API shape.
       placeholder: |
-        kosmon logs live --lines 50
-        → streams kosply-server-live output like pm2 logs
+        kosmon logs main --lines 50
+        → streams kosply-server-main output like pm2 logs
   - type: checkboxes
     id: staging
     attributes:
       label: Staging-first check
-      description: New runtime behavior must pass on staging before live.
+      description: New runtime behavior must pass on staging before main.
       options:
         - label: I understand this must be tested on staging (`:3001`) first

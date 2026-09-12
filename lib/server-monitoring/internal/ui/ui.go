@@ -58,14 +58,14 @@ func Failure(msg string) { fmt.Println(paint(cRed, "[error] ") + msg) }
 // targets below it. It is always the first thing shown in interactive mode.
 func Banner(version string) {
 	fmt.Println(paint(cBold+cCyan, `
-  ██╗  ██╗ ██████╗ ███████╗██████╗ ██╗  ██╗   ██╗
-  ██║ ██╔╝██╔═══██╗██╔════╝██╔══██╗██║  ╚██╗ ██╔╝
-  █████╔╝ ██║   ██║███████╗██████╔╝██║   ╚████╔╝
-  ██╔═██╗ ██║   ██║╚════██║██╔═══╝ ██║    ╚██╔╝
-  ██║  ██╗╚██████╔╝███████║██║     ██║     ██║
-  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝     ╚═╝     ╚═╝`))
+  ██╗  ██╗ ██████╗ ███████╗███╗   ███╗ ██████╗ ███╗   ██╗
+  ██║ ██╔╝██╔═══██╗██╔════╝████╗ ████║██╔═══██╗████╗  ██║
+  █████╔╝ ██║   ██║███████╗██╔████╔██║██║   ██║██╔██╗ ██║
+  ██╔═██╗ ██║   ██║╚════██║██║╚██╔╝██║██║   ██║██║╚██╗██║
+  ██║  ██╗╚██████╔╝███████║██║ ╚═╝ ██║╚██████╔╝██║ ╚████║
+  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝`))
 	fmt.Printf("  %s\n", paint(cDim, "v"+version))
-	fmt.Printf("  %s\n", paint(cDim, "staging :3001   ·   live :3000"))
+	fmt.Printf("  %s\n", paint(cDim, "staging :3001   ·   main :3000"))
 }
 
 // ClearScreen wipes the terminal so the next screen shows only the

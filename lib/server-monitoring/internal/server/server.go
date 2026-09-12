@@ -1,4 +1,4 @@
-// Package server controls the staging/live processes through PM2.
+// Package server controls the staging/main processes through PM2.
 // All PM2 invocations run from the project root so the relative script
 // path in ecosystem.config.js keeps resolving.
 package server
@@ -114,7 +114,7 @@ func States() (map[string]string, error) {
 		// jlist exits non-zero when the daemon has no processes; treat
 		// empty output as "everything missing" instead of failing.
 		if strings.TrimSpace(out) == "" || strings.TrimSpace(out) == "[]" {
-			return map[string]string{"staging": "missing", "live": "missing"}, nil
+			return map[string]string{"staging": "missing", "main": "missing"}, nil
 		}
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func States() (map[string]string, error) {
 	if err := json.Unmarshal([]byte(out), &entries); err != nil {
 		return nil, fmt.Errorf("parse pm2 jlist: %w", err)
 	}
-	states := map[string]string{"staging": "missing", "live": "missing"}
+	states := map[string]string{"staging": "missing", "main": "missing"}
 	for _, t := range Targets() {
 		for _, e := range entries {
 			if e.Name == t.PM2Name {
@@ -206,7 +206,7 @@ func StopActive() ([]string, error) {
 		return nil, err
 	}
 	if len(active) == 0 {
-		return nil, fmt.Errorf("no active server (staging and live are both down)")
+		return nil, fmt.Errorf("no active server (staging and main are both down)")
 	}
 	stopped := make([]string, 0, len(active))
 	for _, t := range active {
@@ -225,7 +225,7 @@ func RestartActive() ([]string, error) {
 		return nil, err
 	}
 	if len(active) == 0 {
-		return nil, fmt.Errorf("no active server (staging and live are both down)")
+		return nil, fmt.Errorf("no active server (staging and main are both down)")
 	}
 	restarted := make([]string, 0, len(active))
 	for _, t := range active {

@@ -10,11 +10,11 @@ Kosply backend — Express + PM2. Server focus for now.
 ## Structure
 ```
 Kosply-backend/
-  ecosystem.config.js       # PM2: 2 apps (staging + live)
+  ecosystem.config.js       # PM2: 2 apps (staging + main)
   package.json              # root scripts -> lib/server
   .env.example
   scripts/
-    server.sh             # single launcher: ./scripts/server.sh <staging|live> [start|stop|restart|status]
+    server.sh             # single launcher: ./scripts/server.sh <staging|main> [start|stop|restart|status]
   lib/
     server/                 # all server code lives here
       server.js             # entrypoint + graceful shutdown
@@ -48,7 +48,7 @@ npm run start:staging   # single instance on :3001
 # PM2 via single helper script (recommended, delegates to kosmon when built)
 ./scripts/server.sh staging
 # test http://localhost:3001/api/health
-./scripts/server.sh live
+./scripts/server.sh main
 
 pm2 status
 ```
@@ -56,14 +56,14 @@ pm2 status
 ## Scripts
 - `dev` / `start` — local dev on `:3000` (uses `.env`)
 - `dev:staging` / `start:staging` — staging simulation on `:3001`
-- `start:live` — live simulation, single instance on `:3000`
-- `scripts/server.sh <staging|live> [start|stop|restart|status]` — single PM2 launcher (uses `kosmon` when built)
-- `pm2:start` — run staging + live together
-- `pm2:start:staging` / `pm2:start:live` — run one of them
-- `pm2:stop / pm2:restart / pm2:logs` (plus `:staging` / `:live`) — manage per env
+- `start:main` — main simulation, single instance on `:3000`
+- `scripts/server.sh <staging|main> [start|stop|restart|status]` — single PM2 launcher (uses `kosmon` when built)
+- `pm2:start` — run staging + main together
+- `pm2:start:staging` / `pm2:start:main` — run one of them
+- `pm2:stop / pm2:restart / pm2:logs` (plus `:staging` / `:main`) — manage per env
 
 ## Env
-| Key | Local | Staging (PM2) | Live (PM2) |
+| Key | Local | Staging (PM2) | Main (PM2) |
 |---|---|---|---|
 | `NODE_ENV` | `development` | `staging` | `production` |
 | `PORT` | `3000` | `3001` | `3000` |
@@ -81,13 +81,13 @@ pm2 status
 
 ## PM2 notes
 - `kosply-server-staging` — `fork`, 1 instance, `:3001`. Playground: test freely, restart anytime.
-- `kosply-server-live` — `cluster` (`instances: max`), `:3000`. Serves real users, never test here directly.
+- `kosply-server-main` — `cluster` (`instances: max`), `:3000`. Serves real users, never test here directly.
 - `server.js` handles `SIGTERM`/`SIGINT` + `unhandledRejection`, safe for `pm2 restart/reload`.
-- Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001` → pass → `./scripts/server.sh live restart`.
+- Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001` → pass → `./scripts/server.sh main restart`.
 
 ## Server monitoring CLI (Go)
 
-`lib/server-monitoring/` (`kosmon`) tests APIs and controls staging/live.
+`lib/server-monitoring/` (`kosmon`) tests APIs and controls staging/main.
 Stdlib only. Two versions:
 
 ```bash
@@ -97,8 +97,8 @@ go build -o kosmon .
 ./kosmon                                # interactive: ASCII banner + version + menu
 ./kosmon list                           # list all APIs
 ./kosmon test /api/health --env staging # call an endpoint
-./kosmon start|stop|restart <staging|live>
-./kosmon switch live                    # run live, stop staging
+./kosmon start|stop|restart <staging|main>
+./kosmon switch main                     # run main, stop staging
 ```
 
 Set `KOSPLY_ROOT` if auto-detection of the project root fails.

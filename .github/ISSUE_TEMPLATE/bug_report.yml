@@ -1,5 +1,5 @@
 name: Bug report
-description: Something broken in staging or live? Tell us how to reproduce it.
+description: Something broken in staging or main? Tell us how to reproduce it.
 labels: [bug]
 body:
   - type: input
@@ -17,7 +17,7 @@ body:
       description: Where did you see it?
       options:
         - staging (:3001)
-        - live (:3000)
+        - main (:3000)
         - local dev
     validations:
       required: true

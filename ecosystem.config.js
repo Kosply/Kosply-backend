@@ -1,13 +1,13 @@
 /**
  * @title PM2 process configuration
- * @notice Defines the staging and live processes for Kosply server.
+ * @notice Defines the staging and main processes for Kosply server.
  * @dev Staging (:3001, fork, 1 instance) is the playground: test anything
- * @dev here first. Live (:3000, cluster, max instances) serves real users
+ * @dev here first. Main (:3000, cluster, max instances) serves real users
  * @dev and must only be restarted after staging passes.
  */
 module.exports = {
   apps: [
-    // STAGING: test anything here before promoting to live. Runs alongside live on a different port.
+    // STAGING: test anything here before promoting to main. Runs alongside main on a different port.
     {
       name: 'kosply-server-staging',
       script: './lib/server/server.js',
@@ -21,9 +21,9 @@ module.exports = {
         CORS_ORIGIN: '*',
       },
     },
-    // LIVE: serves real users, must stay stable. Never test directly here.
+    // MAIN: serves real users, must stay stable. Never test directly here.
     {
-      name: 'kosply-server-live',
+      name: 'kosply-server-main',
       script: './lib/server/server.js',
       instances: 'max',
       exec_mode: 'cluster',

@@ -8,19 +8,19 @@
     "dev:staging": "NODE_ENV=staging PORT=3001 node --watch lib/server/server.js",
     "start": "node lib/server/server.js",
     "start:staging": "NODE_ENV=staging PORT=3001 node lib/server/server.js",
-    "start:live": "NODE_ENV=production PORT=3000 node lib/server/server.js",
+    "start:main": "NODE_ENV=production PORT=3000 node lib/server/server.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:start:staging": "pm2 start ecosystem.config.js --only kosply-server-staging",
-    "pm2:start:live": "pm2 start ecosystem.config.js --only kosply-server-live",
-    "pm2:stop": "pm2 stop kosply-server-staging kosply-server-live",
+    "pm2:start:main": "pm2 start ecosystem.config.js --only kosply-server-main",
+    "pm2:stop": "pm2 stop kosply-server-staging kosply-server-main",
     "pm2:stop:staging": "pm2 stop kosply-server-staging",
-    "pm2:stop:live": "pm2 stop kosply-server-live",
-    "pm2:restart": "pm2 restart kosply-server-staging kosply-server-live",
+    "pm2:stop:main": "pm2 stop kosply-server-main",
+    "pm2:restart": "pm2 restart kosply-server-staging kosply-server-main",
     "pm2:restart:staging": "pm2 restart kosply-server-staging",
-    "pm2:restart:live": "pm2 restart kosply-server-live",
-    "pm2:logs": "pm2 logs kosply-server-staging kosply-server-live",
+    "pm2:restart:main": "pm2 restart kosply-server-main",
+    "pm2:logs": "pm2 logs kosply-server-staging kosply-server-main",
     "pm2:logs:staging": "pm2 logs kosply-server-staging",
-    "pm2:logs:live": "pm2 logs kosply-server-live"
+    "pm2:logs:main": "pm2 logs kosply-server-main"
   },
   "engines": {
     "node": ">=18"

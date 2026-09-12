@@ -1,6 +1,6 @@
 # server-monitoring
 
-Go CLI to test Kosply APIs and control the staging/live servers. Stdlib only, no external dependencies.
+Go CLI to test Kosply APIs and control the staging/main servers. Stdlib only, no external dependencies.
 
 ## Build
 
@@ -65,19 +65,19 @@ Piped/non-TTY input falls back to numbered selection automatically.
 ```bash
 ./kosmon list
 ./kosmon test /api/health --env staging
-./kosmon test / --env live -m GET
+./kosmon test / --env main -m GET
 ./kosmon start staging
-./kosmon stop live
+./kosmon stop main
 ./kosmon restart staging
 ./kosmon status
-./kosmon switch live     # run live, stop staging
+./kosmon switch main     # run main, stop staging
 ./kosmon version
 ./kosmon help
 ```
 
 ## How it works
 
-- API calls go to `staging :3001` or `live :3000` with a 10s timeout.
+- API calls go to `staging :3001` or `main :3000` with a 10s timeout.
   HTTP error statuses are still printed (status + body) instead of failing,
   so broken endpoints are easy to inspect.
 - Server control shells out to PM2 from the project root (auto-detected by
