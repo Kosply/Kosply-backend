@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/health'
+description: 'Service health (uptime, timestamp).'
+order: 1100
+headers: []

@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/internal/products/search?q=kipas'
+description: 'Agent machine API: keyword search.'
+order: 10000
+headers: []

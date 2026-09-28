@@ -1,0 +1,14 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/ai/chat'
+description: 'One AI turn via server proxy (JWT identity). Needs the agent up; else 503.'
+order: 11000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "message": "halo"
+    }

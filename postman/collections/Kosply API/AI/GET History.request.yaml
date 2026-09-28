@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/ai/history/{{conversationId}}'
+description: 'Session messages via the agent (needs it up).'
+order: 11400
+headers: []

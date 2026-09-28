@@ -1,0 +1,18 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/verifications'
+description: 'Submit KTM application (JWT). One active application per user.'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "namaLengkap": "Postman User",
+      "nim": "NIM{{tag}}",
+      "universitas": "Univ Test",
+      "programStudi": "Prodi Test",
+      "ktmImageUrl": "dev://ktm"
+    }

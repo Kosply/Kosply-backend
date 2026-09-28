@@ -1,0 +1,14 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/support/tickets/{{ticketId}}/messages'
+description: 'Reply in the ticket (admins may set isInternal).'
+order: 6300
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "text": "tolong dibantu"
+    }

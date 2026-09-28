@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/ai/conversations'
+description: 'Own AI sessions for the history list (JWT).'
+order: 11300
+headers: []

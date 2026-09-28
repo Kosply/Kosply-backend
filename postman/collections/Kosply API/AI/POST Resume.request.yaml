@@ -1,0 +1,15 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/ai/chat/resume'
+description: 'Answer a pending approval (approve true/false).'
+order: 11200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "conversation_id": "{{conversationId}}",
+      "approve": true
+    }

@@ -1,0 +1,14 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/messages'
+description: 'Send TEXT/IMAGE/LOCATION bubble as a member.'
+order: 5300
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "text": "bisa COD besok?"
+    }

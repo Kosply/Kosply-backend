@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations/{{conversationId}}'
+description: 'Room detail, members only.'
+order: 5200
+headers: []

@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations'
+description: 'Own rooms, newest activity first (JWT).'
+order: 5100
+headers: []

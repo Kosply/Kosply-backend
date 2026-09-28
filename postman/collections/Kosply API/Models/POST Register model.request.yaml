@@ -1,0 +1,17 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/models'
+description: 'ADMIN only. Captures modelId.'
+order: 9100
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "modelId": "test-model-pm",
+      "name": "Test Model",
+      "inputPrice": 1,
+      "outputPrice": 2
+    }

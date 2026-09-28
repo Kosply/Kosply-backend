@@ -1,0 +1,19 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/auth/register'
+description: 'Register a buyer (201). Token + userId captured to collection variables.'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{tag}}@kosply.test",
+      "username": "{{tag}}",
+      "name": "Postman User",
+      "password": "secret123",
+      "universitas": "Univ Test",
+      "programStudi": "Prodi Test"
+    }

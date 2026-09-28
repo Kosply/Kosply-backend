@@ -1,0 +1,17 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/products'
+description: 'Seller only (JWT + role SELLER). Captures productId.'
+order: 3200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Tas selempang",
+      "description": "Jarang dipakai.",
+      "price": 75000,
+      "stock": 1
+    }

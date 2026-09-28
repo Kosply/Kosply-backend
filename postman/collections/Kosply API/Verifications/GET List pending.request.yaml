@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/verifications?status=PENDING'
+description: 'ADMIN only; buyers get 403.'
+order: 4200
+headers: []

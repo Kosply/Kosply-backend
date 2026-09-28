@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/messages'
+description: 'History oldest-first; marks the other side read.'
+order: 5400
+headers: []

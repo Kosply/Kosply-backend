@@ -1,0 +1,14 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/products/{{productId}}'
+description: 'Owner or ADMIN. Partial fields.'
+order: 3300
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "price": 70000
+    }
