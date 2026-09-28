@@ -1,6 +1,7 @@
 # Kosply DB
 
-Postgres + Prisma. Kotak level `lib/` sejajar dengan `server/` — `server/` tetap tipis, cuma baca `DATABASE_URL` dari env.
+Postgres + Prisma. A `lib/`-level box next to `server/` — `server/` stays thin
+and only reads `DATABASE_URL` from the env.
 
 ## Stack
 - Postgres 16 (via root `docker-compose.yml`)
@@ -10,25 +11,26 @@ Postgres + Prisma. Kotak level `lib/` sejajar dengan `server/` — `server/` tet
 ## Structure
 ```
 lib/db/
-  package.json          # manifest sendiri: @prisma/client + prisma
-  .env.example          # contoh DATABASE_URL dev/staging/main
-  prisma/schema.prisma  # User, SellerVerification, Product + enums
-  .db_spec/             # spec tabel (cerminan schema, per tabel)
-  src/client.js         # singleton PrismaClient
-  docker/init.sql       # create DB staging + main
+  package.json          # own manifest: @prisma/client + prisma
+  .env.example          # DATABASE_URL samples for dev/staging/main
+  prisma/schema.prisma  # models + enums (English NatSpec)
+  prisma/migrations/    # committed migration history
+  .db_spec/             # per-table specs (English, mirrors the schema)
+  src/client.js         # PrismaClient singleton
+  docker/init.sql       # create staging + main DBs
 ```
 
 ## Run
 ```bash
-# 1. Naikkan Postgres (dari root)
+# 1. Start Postgres (from root)
 docker compose up -d postgres
 
-# 2. Install + generate (dari lib/db)
+# 2. Install + generate (from lib/db)
 cd lib/db
 npm install
 npx prisma generate
 
-# 3. Migrasi dev
+# 3. Dev migration
 npx prisma migrate dev --name init
 
 # Studio
@@ -36,17 +38,21 @@ npx prisma studio
 ```
 
 ## Models
-- `User`: email unique, username unique, name, passwordHash (jangan plain!), universitas, programStudi, role `BUYER|SELLER|ADMIN`.
-- `SellerVerification`: `userId unique`, namaLengkap (sesuai KTM), nim unique, universitas, programStudi, ktmImageUrl (private!), status `PENDING|APPROVED|REJECTED`, `isActive` (aktif/non-aktif, false = dibekukan), `action NONE|APPROVE|REJECT` + `actionNote`, `reviewedBy/reviewedAt`.
-- `Product`: sellerId FK User, title, description (@db.Text), price Int rupiah, stock Int (quantities), imageUrls String[] (cover = [0]), category String? (blank dulu, TODO FK), status `ACTIVE|SOLD|ARCHIVED`.
-- `Conversation`: room COD per produk — `productId?` (SetNull biar history awet), `buyerId`, `sellerId`, `lastMessageAt`. Unique `[productId, buyerId]` = 1 buyer x 1 produk = 1 room.
+- `User`: email unique, username unique, name, passwordHash (never plain!), universitas, programStudi, bio?, role `BUYER|SELLER|ADMIN`.
+- `SellerVerification`: `userId unique`, namaLengkap (as printed on KTM), nim unique, universitas, programStudi, ktmImageUrl (private!), status `PENDING|APPROVED|REJECTED`, `isActive` (false = frozen), `action NONE|APPROVE|REJECT` + `actionNote`, `reviewedBy/reviewedAt`.
+- `Product`: sellerId FK User, title, description (@db.Text), price Int rupiah, stock Int (quantities), imageUrls String[] (cover = [0]), category String? (blank for now, TODO FK), location (latitude/longitude/locationLabel), status `ACTIVE|SOLD|ARCHIVED`.
+- `Conversation`: COD room per product — `productId?` (SetNull keeps history), `buyerId`, `sellerId`, agreed COD point, `lastMessageAt`. Unique `[productId, buyerId]` = 1 buyer x 1 product = 1 room.
 - `Message`: `conversationId`, `senderId`, `type TEXT|IMAGE|LOCATION|SYSTEM`, `text` (TEXT), `imageUrl` (IMAGE), `latitude/longitude/locationLabel` (LOCATION), `isRead/readAt`.
-- `SupportTicket`: `ticketNo unique` (tampil, mis. KSP-...), `userId` pelapor (nama/username via join, tanpa duplikasi), `category AKUN|PRODUK|CHAT|VERIFIKASI|LAPORAN|LAINNYA`, `status ACTIVE|CLOSED`, `subject`, `description`, `lastMessageAt`.
-- `SupportMessage`: `ticketId`, `senderId` (pelapor atau ADMIN), `text`, `imageUrl?`, `isInternal` (catatan admin, sembunyikan dari user), `isRead/readAt`.
-- `Report`: `reportNo unique` (tampil, mis. RPT-...), `reporterId` pelapor, `reportedUserId?` (fraud/terlapor), `reportedProductId?` (postingan), `category PENIPUAN|BARANG_PALSU|...|LAINNYA`, `description`, `evidenceUrls[]`, `status PENDING|IN_REVIEW|RESOLVED|REJECTED`, `action NONE|WARNING|DELETE_PRODUCT|BAN_USER`, `reviewedBy/reviewedAt`.
+- `SupportTicket`: `ticketNo unique` (display, e.g. KSP-...), `userId` reporter (name/username via join, no duplication), `category AKUN|PRODUK|CHAT|VERIFIKASI|LAPORAN|LAINNYA`, `status ACTIVE|CLOSED`, `subject`, `description`, `lastMessageAt`.
+- `SupportMessage`: `ticketId`, `senderId` (reporter or ADMIN), `text`, `imageUrl?`, `isInternal` (admin note, hidden from reporter), `isRead/readAt`.
+- `Report`: `reportNo unique` (display, e.g. RPT-...), `reporterId`, `reportedUserId?` (fraud/reported), `reportedProductId?` (listing), `category PENIPUAN|BARANG_PALSU|...|LAINNYA`, `description`, `evidenceUrls[]`, `status PENDING|IN_REVIEW|RESOLVED|REJECTED`, `action NONE|WARNING|DELETE_PRODUCT|BAN_USER`, `reviewedBy/reviewedAt`.
+- `Admin`: dashboard account (email unique, passwordHash, isActive), separate from `users`.
+- `PasswordReset`: 4-digit OTP rows (`codeHash`, `expiresAt`, `attempts`, `consumedAt`).
+- `AiConversation` / `AiMessage`: resumable AI sessions (`thread_id` = row id); `AiMessage.model` matches `AiModel.modelId`.
+- `AiModel`: registry (`modelId unique`, pricing USD per 1M tokens, `isActive`).
 
 ## Rules
-- Seller = `User.role == SELLER` (dipromosikan setelah verifikasi APPROVED).
-- `ktmImageUrl` jangan pernah ikut response `/api/products` — hanya admin via endpoint verifikasi.
-- Validasi `price >= 0`, `stock >= 0` di service/zod nanti (DB simpan Int polos).
-- Tiap env DB terpisah: `kosply_dev` (local), `kosply_staging` (:3001), `kosply_main` (:3000).
+- Seller = `User.role == SELLER` (promoted after APPROVED verification).
+- `ktmImageUrl` never leaves via `/api/products` — admin verification endpoint only.
+- `price >= 0`, `stock >= 0` validated in service/zod later (DB stores plain Int).
+- Separate DB per env: `kosply_dev` (local), `kosply_staging` (:3001), `kosply_main` (:3000).
