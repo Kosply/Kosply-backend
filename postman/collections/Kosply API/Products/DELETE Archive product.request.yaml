@@ -1,0 +1,6 @@
+$kind: http-request
+method: DELETE
+url: '{{baseUrl}}/api/products/{{productId}}'
+description: 'Soft delete (ARCHIVED). Owner or ADMIN.'
+order: 3400
+headers: []

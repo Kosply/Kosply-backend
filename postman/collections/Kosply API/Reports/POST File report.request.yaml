@@ -1,0 +1,16 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/reports'
+description: 'Report fraud (RPT-…). Needs a target. Captures reportId.'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "reportedProductId": "dev-product-1",
+      "category": "BARANG_TIDAK_SESUAI",
+      "description": "tidak sesuai foto"
+    }

@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/verifications/me'
+description: 'Own application status (JWT).'
+order: 4100
+headers: []

@@ -1,0 +1,16 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/support/tickets'
+description: 'Open a help ticket (KSP-…). Captures ticketId.'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "category": "AKUN",
+      "subject": "login gagal",
+      "description": "tidak bisa masuk"
+    }

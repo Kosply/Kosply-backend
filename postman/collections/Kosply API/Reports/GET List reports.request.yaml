@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/reports?status=PENDING'
+description: 'ADMIN only.'
+order: 7100
+headers: []

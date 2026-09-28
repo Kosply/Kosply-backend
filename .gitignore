@@ -6,3 +6,6 @@ logs/
 
 # Go build output
 lib/server-monitoring/kosmon
+
+# Local Postman workspace state (personal workspace id, regenerates)
+.postman/

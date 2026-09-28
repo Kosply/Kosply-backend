@@ -1,0 +1,15 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/admin/login'
+description: 'Separate admins table. Seed via ADMIN_SEED_EMAIL/PASSWORD then npm run seed (lib/db).'
+order: 8000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@kosply.test",
+      "password": "admin123"
+    }

@@ -1,0 +1,6 @@
+$kind: http-request
+method: DELETE
+url: '{{baseUrl}}/api/models/{{modelId}}'
+description: 'Refused when chat history references it. ADMIN only.'
+order: 9300
+headers: []

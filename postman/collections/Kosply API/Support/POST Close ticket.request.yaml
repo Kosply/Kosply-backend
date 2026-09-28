@@ -1,0 +1,12 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/support/tickets/{{ticketId}}/close'
+description: 'Owner or ADMIN closes.'
+order: 6400
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {}

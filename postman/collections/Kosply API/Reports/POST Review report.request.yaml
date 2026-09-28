@@ -1,0 +1,15 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/reports/{{reportId}}/review'
+description: 'WARNING | DELETE_PRODUCT | BAN_USER (NONE dismisses). ADMIN only.'
+order: 7200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "action": "WARNING",
+      "actionNote": "peringatan pertama"
+    }

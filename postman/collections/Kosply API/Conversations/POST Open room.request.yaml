@@ -1,0 +1,15 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/conversations'
+description: 'Open/reuse a COD room (productId derives the seller). Captures conversationId.'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "productId": "dev-product-1",
+      "message": { "text": "halo, masih ada?" }
+    }

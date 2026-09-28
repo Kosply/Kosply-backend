@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/models'
+description: 'Active AI models for the Flutter selector.'
+order: 9000
+headers: []

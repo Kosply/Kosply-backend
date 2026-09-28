@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/support/tickets/{{ticketId}}'
+description: 'Detail + messages (internal notes hidden from reporters).'
+order: 6200
+headers: []

@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/'
+description: 'Root probe. Returns `{ name, status, env }`.'
+order: 1000
+headers: []
