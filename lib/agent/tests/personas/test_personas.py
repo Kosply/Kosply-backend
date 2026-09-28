@@ -80,7 +80,7 @@ class PersonaRouteTest(BaseAgentTest):
 
     async def test_chat_with_role(self):
         """POST /ai/chat accepts role and answers normally."""
-        app.state.graph = self.make_graph([canned_answer("siap bantu jualan")])
+        self.mount_fake([canned_answer("siap bantu jualan")])
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:

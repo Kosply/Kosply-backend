@@ -1,13 +1,31 @@
 """Sensitive tools: they only run after the user approves them
 (see `human_approval` in `graph.py` + POST /ai/chat/resume)."""
 
+from typing import Annotated
+
+import httpx
 from langchain_core.tools import tool
+from langgraph.prebuilt import InjectedState
+
+from app.core.config import settings
+from app.core.errors import ToolError
 
 
 @tool
-def request_seller_contact(product_id: str, message: str) -> str:
+def request_seller_contact(
+    product_id: str,
+    message: str,
+    state: Annotated[dict, InjectedState()],
+) -> str:
     """Ask a seller to contact you about a product. Requires user approval."""
-    return (
-        f"Contact request queued for product {product_id}: {message!r}. "
-        "TODO(server): deliver via POST /internal/contact-requests."
-    )
+    buyer_id = (state or {}).get("user_id", "")
+    try:
+        resp = httpx.post(
+            f"{settings.kosply_server_url}/api/internal/contact-requests",
+            json={"productId": product_id, "buyerId": buyer_id, "message": message},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+    except Exception as exc:
+        raise ToolError(f"contact request failed: {exc}") from exc
+    return str(resp.json())

@@ -24,6 +24,8 @@ lib/agent/
       config.py           # env loader (strict PORT, like lib/server/config/env.js)
       dsn.py              # pg_dsn: strip Prisma-only params (?schema=) for raw drivers
       errors.py           # AgentError hierarchy + handlers (409 = needs approval)
+      ratelimit.py        # sliding-window limiter + /ai/* middleware (429)
+      caps.py             # body cap (413), bounded runs (503/504), stream slots
     api/                  # HTTP layer
       routes.py           # /health, /ai/chat, /ai/chat/stream, /ai/chat/resume, /ai/history/:id
       schemas.py          # pydantic request/response
@@ -62,6 +64,8 @@ uvicorn app.main:app --port 8000
   category (loop + approval, HTTP, history-store, policy, thinking, personas).
 - `tests/message/` — all stateful-message tests (fake model, canned shapes).
 - `tests/loop/` — loop-runner tests (outcomes, bad steps, thread isolation).
+- `tests/security/` — rate limit, body cap, bounded runs/streams.
+- `tests/e2e/` — live wiring vs real server+DB (opt-in `E2E_LIVE=1`).
 
 ## Endpoints
 

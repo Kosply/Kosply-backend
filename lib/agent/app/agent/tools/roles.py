@@ -12,11 +12,12 @@ def get_user_role(user_id: str) -> str:
     """Look up a user's role (BUYER / SELLER / ADMIN) by their id."""
     try:
         resp = httpx.get(
-            f"{settings.kosply_server_url}/internal/users/{user_id}",
+            f"{settings.kosply_server_url}/api/internal/users/{user_id}",
             timeout=10.0,
         )
         resp.raise_for_status()
     except Exception as exc:
         raise ToolError(f"user lookup failed: {exc}") from exc
     data = resp.json() if isinstance(resp.json(), dict) else {}
-    return str(data.get("role", "UNKNOWN")).upper()
+    item = data.get("item", {}) if isinstance(data.get("item"), dict) else {}
+    return str(item.get("role", "UNKNOWN")).upper()

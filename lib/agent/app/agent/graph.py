@@ -24,16 +24,23 @@ from app.agent.policy.guard import ensure_system_prompt
 
 
 def build_graph(checkpointer: object, model_name: str = "", llm: object = None):
-    """Compile the agent graph. Model is lazy: no network call happens here.
+    """Compile the agent graph. The real model inits lazily on first use.
 
     Pass `llm` (e.g. a stateful fake in tests) to skip `init_chat_model`.
+    Lazy init keeps boot green without provider keys; failures surface
+    per-request as ModelError instead of crashing the process.
     """
-    llm = (llm if llm is not None else init_chat_model(model_name)).bind_tools(TOOLS)
+    bound = {"llm": llm.bind_tools(TOOLS) if llm is not None else None}
+
+    def _llm():
+        if bound["llm"] is None:
+            bound["llm"] = init_chat_model(model_name).bind_tools(TOOLS)
+        return bound["llm"]
 
     async def agent(state: AgentState) -> dict:
         """LLM node: answer or emit tool calls (Kosply scope + role persona)."""
         role = state.get("user_role", "UNKNOWN")
-        response = await llm.ainvoke(ensure_system_prompt(state["messages"], role))
+        response = await _llm().ainvoke(ensure_system_prompt(state["messages"], role))
         return {"messages": [response]}
 
     def human_approval(state: AgentState) -> Command:
@@ -65,7 +72,9 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None):
     builder = StateGraph(AgentState)
     builder.add_node("agent", agent)
     builder.add_node("human_approval", human_approval)
-    builder.add_node("tools", ToolNode(TOOLS))
+    # Catch-all tool errors: a failing tool becomes an error ToolMessage the
+    # agent can explain, never a crashed turn. (Default only catches ToolException.)
+    builder.add_node("tools", ToolNode(TOOLS, handle_tool_errors=True))
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", tools_condition, {"tools": "human_approval", END: END})
     builder.add_edge("tools", "agent")

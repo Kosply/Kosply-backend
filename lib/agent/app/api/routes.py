@@ -9,7 +9,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.agent.memory.history_store import load_history, sync_turn
 from app.agent.policy.guard import check_user_message, reply_for
-from app.core.errors import ApprovalRequired, ModelError
+from app.core.caps import run_guarded, stream_guarded
+from app.core.config import settings
+from app.core.errors import AgentError, ApprovalRequired, ModelError
 from .schemas import ChatRequest, ChatResponse, HistoryMessage, HistoryResponse, ResumeRequest
 from .streaming import stream_chat_events
 
@@ -43,6 +45,33 @@ async def health() -> dict:
     return {"status": "ok", "service": "kosply-agent"}
 
 
+@router.get("/readyz")
+async def ready(request: Request) -> dict:
+    """Readiness probe: 200 when the persistence backend answers."""
+    from fastapi.responses import JSONResponse
+
+    from app.agent.memory.checkpointer import describe_saver
+    from app.core.dsn import pg_dsn
+
+    backend = describe_saver(request.app.state.saver)
+    if backend == "memory":
+        return {"status": "degraded", "checkpointer": backend}
+    try:
+        from psycopg import AsyncConnection
+
+        conn = await AsyncConnection.connect(pg_dsn(settings.database_url or ""))
+        try:
+            await conn.execute("SELECT 1")
+        finally:
+            await conn.close()
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "down", "checkpointer": backend},
+        )
+    return {"status": "ok", "checkpointer": backend}
+
+
 @router.post("/ai/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     """One chat turn (non-streaming). 409 when a tool needs approval."""
@@ -53,14 +82,21 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
         return ChatResponse(conversation_id=req.conversation_id, answer=reply)
     graph = request.app.state.graph
     try:
-        result = await graph.ainvoke(
-            {
-                "messages": [HumanMessage(content=req.message)],
-                "user_id": req.user_id,
-                "user_role": req.role,
-            },
-            _thread(req.conversation_id),
+        result = await run_guarded(
+            request.app.state.inflight,
+            lambda: graph.ainvoke(
+                {
+                    "messages": [HumanMessage(content=req.message)],
+                    "user_id": req.user_id,
+                    "user_role": req.role,
+                },
+                _thread(req.conversation_id),
+            ),
+            queue_timeout_s=settings.queue_timeout_s,
+            run_timeout_s=settings.model_timeout_s,
         )
+    except AgentError:
+        raise
     except Exception as exc:
         raise ModelError(str(exc)) from exc
     _raise_if_interrupted(result)
@@ -71,7 +107,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
 
 @router.post("/ai/chat/stream")
 async def chat_stream(req: ChatRequest, request: Request) -> EventSourceResponse:
-    """One chat turn as SSE (`token` / `interrupt` / `done` events)."""
+    """One chat turn as SSE (`token` / `thinking` / `interrupt` / `done` events)."""
     verdict = check_user_message(req.message)
     if not verdict.allowed:
         reply = reply_for(verdict.reason)
@@ -85,12 +121,16 @@ async def chat_stream(req: ChatRequest, request: Request) -> EventSourceResponse
         return EventSourceResponse(_rejected())
     graph = request.app.state.graph
     return EventSourceResponse(
-        stream_chat_events(
-            graph,
-            message=req.message,
-            user_id=req.user_id,
-            conversation_id=req.conversation_id,
-            role=req.role,
+        stream_guarded(
+            request.app.state.inflight,
+            stream_chat_events(
+                graph,
+                message=req.message,
+                user_id=req.user_id,
+                conversation_id=req.conversation_id,
+                role=req.role,
+            ),
+            queue_timeout_s=settings.queue_timeout_s,
         )
     )
 
@@ -100,10 +140,17 @@ async def resume(req: ResumeRequest, request: Request) -> ChatResponse:
     """Answer a pending approval: approve runs the tool, reject cancels it."""
     graph = request.app.state.graph
     try:
-        result = await graph.ainvoke(
-            Command(resume="approve" if req.approve else "reject"),
-            _thread(req.conversation_id),
+        result = await run_guarded(
+            request.app.state.inflight,
+            lambda: graph.ainvoke(
+                Command(resume="approve" if req.approve else "reject"),
+                _thread(req.conversation_id),
+            ),
+            queue_timeout_s=settings.queue_timeout_s,
+            run_timeout_s=settings.model_timeout_s,
         )
+    except AgentError:
+        raise
     except Exception as exc:
         raise ModelError(str(exc)) from exc
     _raise_if_interrupted(result)

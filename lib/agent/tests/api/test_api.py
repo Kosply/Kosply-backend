@@ -25,7 +25,7 @@ class ApiTest(BaseAgentTest):
 
     async def test_chat_approval_then_resume(self):
         """HTTP approval flow: 409 names the tool, resume completes the turn."""
-        app.state.graph = self.make_graph(
+        self.mount_fake(
             [
                 canned_tool_call(
                     "request_seller_contact",
@@ -54,7 +54,7 @@ class ApiTest(BaseAgentTest):
     async def test_chat_stream(self):
         """SSE stream ends with a done event."""
         self.reset_sse()
-        app.state.graph = self.make_graph([canned_answer("halo juga")])
+        self.mount_fake([canned_answer("halo juga")])
         async with AsyncClient(
             transport=self._transport(), base_url="http://test"
         ) as client:
@@ -69,7 +69,7 @@ class ApiTest(BaseAgentTest):
 
     async def test_history(self):
         """History lists both sides of the finished turn."""
-        app.state.graph = self.make_graph([canned_answer("hai")])
+        self.mount_fake([canned_answer("hai")])
         async with AsyncClient(
             transport=self._transport(), base_url="http://test"
         ) as client:
@@ -82,3 +82,13 @@ class ApiTest(BaseAgentTest):
         roles = [m["role"] for m in res.json()["messages"]]
         self.assertIn("human", roles)
         self.assertIn("ai", roles)
+
+    async def test_readyz_degraded_without_postgres(self):
+        """Readiness reports degraded (not down) on the memory checkpointer."""
+        self.mount_fake([canned_answer("hai")])
+        async with AsyncClient(
+            transport=self._transport(), base_url="http://test"
+        ) as client:
+            res = await client.get("/readyz")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["status"], "degraded")

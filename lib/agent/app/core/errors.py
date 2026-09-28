@@ -27,6 +27,26 @@ class ModelError(AgentError):
     """LLM call failed (missing key, provider down, bad model id)."""
 
 
+class ModelTimeout(ModelError):
+    """LLM call exceeded its hard ceiling (HTTP 504)."""
+
+    status_code: int = 504
+
+    def __init__(self) -> None:
+        """Fixed message; duration lives in server logs, not the response."""
+        super().__init__("model call timed out")
+
+
+class ServerBusy(AgentError):
+    """No capacity slot freed in time (HTTP 503, retry with backoff)."""
+
+    status_code: int = 503
+
+    def __init__(self) -> None:
+        """Fixed message; queue depth lives in server logs, not the response."""
+        super().__init__("server busy, try again")
+
+
 class ToolError(AgentError):
     """A tool (catalog / internal API) call failed."""
 
