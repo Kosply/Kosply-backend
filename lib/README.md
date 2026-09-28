@@ -11,15 +11,17 @@ other's code directly.
 | `server/` | Node (Express) | HTTP API: staging `:3001`, main `:3000` |
 | `server-monitoring/` | Go (`kosmon` CLI) | Test endpoints, control staging/main via PM2 |
 | `db/` | Node (Prisma) + Postgres 16 | Schema + client: User, SellerVerification, Product |
+| `agent/` | Python (FastAPI + LangGraph) | AI microservice: streaming chat, approval, resume |
 
 Details live in each folder's README:
 
 - `server/README.md` — API structure, env, run, adding modules
 - `server-monitoring/README.md` — build, interactive + non-interactive use
+- `agent/README.md` — AI endpoints, streaming, approval/resume flow
 
 ## Rules for adding a new lib
 
-1. One folder per runtime (e.g. `agent/` for Python later). Exception: `db/` is a shared library (Prisma schema + client), not a running process.
+1. One folder per runtime (`server/` Node, `server-monitoring/` Go, `agent/` Python). Exception: `db/` is a shared library (Prisma schema + client), not a running process.
 2. Own manifest only: `package.json` for Node, `requirements.txt` /
    `pyproject.toml` for Python, `go.mod` for Go. Never mix.
 3. No direct imports across runtimes — communicate over HTTP on

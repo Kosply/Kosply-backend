@@ -21,3 +21,8 @@ AI chat session between a user and the AI. Resumable — the user can reopen a s
 1. First user message → create `AiConversation` (title = truncated first message) + `AiMessage(role=USER)`.
 2. Reopen session → load `ai_messages` ordered by `createdAt` → append new `USER` / `ASSISTANT` pairs.
 3. Rename → update `title` only.
+
+## Agent mapping
+
+- `lib/agent` uses this `id` as the LangGraph `thread_id`, so the checkpointer
+  history and these tables stay aligned per session.
