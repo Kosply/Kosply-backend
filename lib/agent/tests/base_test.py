@@ -91,14 +91,18 @@ class BaseAgentTest(unittest.IsolatedAsyncioTestCase):
         """LangGraph config pointing at one resume thread."""
         return {"configurable": {"thread_id": thread or self.THREAD_ID}}
 
-    async def loop(self, graph, steps, thread=None) -> list:
+    async def loop(self, graph, steps, thread=None, role="UNKNOWN") -> list:
         """Run loop steps on one thread. Returns one outcome per step."""
         outcomes = []
         config = self._config(thread)
         for kind, payload in steps:
             if kind == "send":
                 result = await graph.ainvoke(
-                    {"messages": [HumanMessage(content=payload)], "user_id": "u-test"},
+                    {
+                        "messages": [HumanMessage(content=payload)],
+                        "user_id": "u-test",
+                        "user_role": role,
+                    },
                     config,
                 )
             elif kind == "approve":

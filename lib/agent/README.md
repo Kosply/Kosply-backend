@@ -32,7 +32,9 @@ lib/agent/
       state.py            # AgentState(MessagesState) — history reducer, enables resume
       graph.py            # agent -> human_approval -> tools, compiled with checkpointer
       policy/             # rules.py (scope+injection), guard.py (pre-check+prompt)
+                          # personas.py (SELLER/BUYER modes by caller role)
       tools/              # basic tools: catalog.py (read-only), contact.py (sensitive)
+                          # roles.py (get_user_role, plain)
       memory/             # checkpointer.py (Postgres persistent, memory fallback)
                           # history_store.py (mirror turns into ai_conversations/ai_messages)
 ```
@@ -56,12 +58,10 @@ uvicorn app.main:app --port 8000
 - `tests/base_test.py` — `StatefulFakeChatModel` (canned replies, consumed in
   order) + `BaseAgentTest.loop()` which replays `send`/`approve` steps on one
   thread_id to exercise memory + resume.
-- `tests/test_graph.py` — plain answer, interrupt→approve, interrupt→reject,
-  history across turns.
-- `tests/test_api.py` — health, chat approval flow, SSE stream, history.
-- `tests/test_policy.py` — injection refusals, scope prompt wiring, route refusals.
-- `tests/test_history_store.py` — role mapping, off-mode no-op.
-- `tests/test_streaming.py` — thinking split (unit) + thinking SSE (integration).
+- `tests/{graph,api,memory,policy,streaming,personas}/` — one folder per
+  category (loop + approval, HTTP, history-store, policy, thinking, personas).
+- `tests/message/` — all stateful-message tests (fake model, canned shapes).
+- `tests/loop/` — loop-runner tests (outcomes, bad steps, thread isolation).
 
 ## Endpoints
 

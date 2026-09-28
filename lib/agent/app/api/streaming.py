@@ -70,12 +70,12 @@ def split_thinking(chunk: Any) -> tuple:
 
 
 async def stream_chat_events(
-    graph: Any, *, message: str, user_id: str, conversation_id: str
+    graph: Any, *, message: str, user_id: str, conversation_id: str, role: str = "UNKNOWN"
 ) -> AsyncIterator[dict]:
     """Yield SSE-ready dicts for EventSourceResponse."""
     config = {"configurable": {"thread_id": conversation_id}}
     async for mode, chunk in graph.astream(
-        {"messages": [HumanMessage(content=message)], "user_id": user_id},
+        {"messages": [HumanMessage(content=message)], "user_id": user_id, "user_role": role},
         config,
         stream_mode=["messages", "updates"],
     ):
