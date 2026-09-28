@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 
+from .personas import build_system_prompt
 from .rules import (
     EMPTY_MESSAGE,
     INJECTION_PATTERNS,
@@ -45,8 +46,8 @@ def check_user_message(text: str | None) -> Verdict:
     return Verdict(True, "")
 
 
-def ensure_system_prompt(messages: list) -> list:
-    """Prepend the Kosply scope prompt once (kept afterwards via checkpoints)."""
+def ensure_system_prompt(messages: list, role: str | None = "UNKNOWN") -> list:
+    """Prepend the Kosply scope + role persona once (kept via checkpoints)."""
     if any(getattr(m, "type", "") == "system" for m in messages):
         return messages
-    return [SystemMessage(content=SYSTEM_PROMPT), *messages]
+    return [SystemMessage(content=build_system_prompt(SYSTEM_PROMPT, role)), *messages]

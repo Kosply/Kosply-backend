@@ -11,6 +11,10 @@ class ChatRequest(BaseModel):
         description="Resume key; reuse the same id to continue a session (maps to ai_conversations.id).",
     )
     user_id: str
+    role: str = Field(
+        default="UNKNOWN",
+        description="Caller role for the persona (BUYER / SELLER); Flutter sends it from login.",
+    )
     message: str
 
 

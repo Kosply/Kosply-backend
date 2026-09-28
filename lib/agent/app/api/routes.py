@@ -54,7 +54,11 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     graph = request.app.state.graph
     try:
         result = await graph.ainvoke(
-            {"messages": [HumanMessage(content=req.message)], "user_id": req.user_id},
+            {
+                "messages": [HumanMessage(content=req.message)],
+                "user_id": req.user_id,
+                "user_role": req.role,
+            },
             _thread(req.conversation_id),
         )
     except Exception as exc:
@@ -86,6 +90,7 @@ async def chat_stream(req: ChatRequest, request: Request) -> EventSourceResponse
             message=req.message,
             user_id=req.user_id,
             conversation_id=req.conversation_id,
+            role=req.role,
         )
     )
 

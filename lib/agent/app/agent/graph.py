@@ -31,8 +31,9 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None):
     llm = (llm if llm is not None else init_chat_model(model_name)).bind_tools(TOOLS)
 
     async def agent(state: AgentState) -> dict:
-        """LLM node: answer or emit tool calls (always under the Kosply scope prompt)."""
-        response = await llm.ainvoke(ensure_system_prompt(state["messages"]))
+        """LLM node: answer or emit tool calls (Kosply scope + role persona)."""
+        role = state.get("user_role", "UNKNOWN")
+        response = await llm.ainvoke(ensure_system_prompt(state["messages"], role))
         return {"messages": [response]}
 
     def human_approval(state: AgentState) -> Command:

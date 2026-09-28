@@ -8,7 +8,8 @@ resume work together with the checkpointer.
 from langgraph.graph import MessagesState
 
 
-class AgentState(MessagesState):
-    """State carried through the graph."""
+class AgentState(MessagesState, total=False):
+    """State carried through the graph (extra keys optional for callers)."""
 
     user_id: str
+    user_role: str
