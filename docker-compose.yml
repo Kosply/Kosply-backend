@@ -18,5 +18,28 @@ services:
       timeout: 3s
       retries: 10
 
+  agent:
+    build: ./lib/agent
+    container_name: kosply-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgresql://kosply:kosply@postgres:5432/kosply_dev?schema=public
+      KOSPLY_SERVER_URL: http://host.docker.internal:3000
+      AI_MODEL: openai:gpt-4o-mini
+      AI_RATE_LIMIT_PER_MIN: 60
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:

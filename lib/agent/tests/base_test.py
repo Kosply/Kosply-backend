@@ -91,6 +91,22 @@ class BaseAgentTest(unittest.IsolatedAsyncioTestCase):
         """LangGraph config pointing at one resume thread."""
         return {"configurable": {"thread_id": thread or self.THREAD_ID}}
 
+    def mount_graph(self, graph):
+        """Point the shared app at a ready graph + fresh semaphore and saver."""
+        import asyncio
+
+        from langgraph.checkpoint.memory import InMemorySaver
+
+        from app.main import app
+
+        app.state.graph = graph
+        app.state.inflight = asyncio.Semaphore(50)
+        app.state.saver = InMemorySaver()
+
+    def mount_fake(self, responses=None):
+        """Point the shared app at a fake graph + fresh semaphore. Returns the graph."""
+        return self.mount_graph(self.make_graph(responses))
+
     async def loop(self, graph, steps, thread=None, role="UNKNOWN") -> list:
         """Run loop steps on one thread. Returns one outcome per step."""
         outcomes = []

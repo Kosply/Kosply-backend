@@ -16,7 +16,7 @@ switches personality: seller mode vs buyer mode.
 | Flutter sends `role` (from login) | `POST /ai/chat` + `/ai/chat/stream` (`ChatRequest.role`, default `UNKNOWN`) |
 | Role stored in state | `AgentState.user_role` (optional key, persists via checkpointer) |
 | Prompt built per turn | `build_system_prompt(SYSTEM_PROMPT, role)` in the `agent` node |
-| Model verifies role itself | `get_user_role` tool (plain, non-sensitive) via server internal API |
+| Model verifies role itself | `get_user_role` tool (plain, non-sensitive) via `GET /api/internal/users/:id` |
 
 ## Rules
 
@@ -24,4 +24,3 @@ switches personality: seller mode vs buyer mode.
 |---|---|
 | Persona never replaces scope | the Kosply scope prompt always stays first, persona is appended |
 | Resume keeps persona | `user_role` lives in checkpointed state; resume needs no re-send |
-| Server TODO | `GET /internal/users/:id` doesn't exist yet — tool reports the miss |

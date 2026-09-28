@@ -37,3 +37,8 @@ async def create_saver() -> tuple[Any, CloseSaver]:
     from langgraph.checkpoint.memory import InMemorySaver
 
     return InMemorySaver(), _noop_close
+
+
+def describe_saver(saver: Any) -> str:
+    """Backend name for readiness output (postgres = durable, memory = degraded)."""
+    return "postgres" if type(saver).__name__.endswith("PostgresSaver") else "memory"

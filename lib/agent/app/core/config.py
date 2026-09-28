@@ -46,6 +46,29 @@ class Settings:
     database_url: str | None
     kosply_server_url: str
     ai_model: str
+    rate_limit_per_min: int
+    max_body_bytes: int
+    max_inflight: int
+    model_timeout_s: float
+    queue_timeout_s: float
+
+
+def _parse_int(raw: str | None, fallback: int) -> int:
+    """Parse a positive int env, else the fallback."""
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError, AttributeError):
+        return fallback
+    return value if value > 0 else fallback
+
+
+def _parse_float(raw: str | None, fallback: float) -> float:
+    """Parse a positive float env, else the fallback."""
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError, AttributeError):
+        return fallback
+    return value if value > 0 else fallback
 
 
 def load_settings() -> Settings:
@@ -55,6 +78,11 @@ def load_settings() -> Settings:
         database_url=os.getenv("DATABASE_URL") or None,
         kosply_server_url=(os.getenv("KOSPLY_SERVER_URL") or "http://localhost:3000").rstrip("/"),
         ai_model=os.getenv("AI_MODEL") or "openai:gpt-4o-mini",
+        rate_limit_per_min=_parse_int(os.getenv("AI_RATE_LIMIT_PER_MIN"), 60),
+        max_body_bytes=_parse_int(os.getenv("AI_MAX_BODY_BYTES"), 1_000_000),
+        max_inflight=_parse_int(os.getenv("AI_MAX_INFLIGHT"), 50),
+        model_timeout_s=_parse_float(os.getenv("AI_MODEL_TIMEOUT_S"), 120.0),
+        queue_timeout_s=_parse_float(os.getenv("AI_QUEUE_TIMEOUT_S"), 5.0),
     )
 
 

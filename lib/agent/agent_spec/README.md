@@ -2,7 +2,7 @@
 
 Source: `lib/agent/` (FastAPI + LangGraph 1.2, basic). Status: **implemented** —
 everything below exists in code, compiles, and is covered by `pytest tests/`
-(40 passed; stateful fake only, no real AI; mirror verified live on Postgres).
+(54 passed, 2 skipped e2e; stateful fake only, no real AI; mirror + e2e verified live on Postgres).
 
 ## Feature index
 
@@ -15,6 +15,8 @@ everything below exists in code, compiles, and is covered by `pytest tests/`
 | History-store (agent ↔ db mirror) | `tables/history_store.md` | implemented |
 | Policy (injection + scope hardening) | `tables/policy.md` | implemented |
 | Personas (seller/buyer modes) | `tables/personas.md` | implemented |
+| Security (limits, caps, readiness) | `tables/security.md` | implemented |
+| Model selector (UI → db → agent) | `tables/model_selector.md` | planned |
 | SSE streaming-conversation | `tables/streaming.md` | implemented |
 | Human-in-the-loop (interrupt/resume) | `tables/human_in_the_loop.md` | implemented |
 | Error hierarchy → HTTP mapping | `tables/errors.md` | implemented |

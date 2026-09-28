@@ -54,7 +54,7 @@ class ThinkingStreamTest(BaseAgentTest):
 
         from app.agent.graph import build_graph
 
-        app.state.graph = build_graph(InMemorySaver(), llm=fake)
+        self.mount_graph(build_graph(InMemorySaver(), llm=fake))
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:

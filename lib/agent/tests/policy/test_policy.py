@@ -97,7 +97,7 @@ class RoutePolicyTest(BaseAgentTest):
         """HTTP refusal answers 200 with the explainer; the model is never called."""
         unused = [canned_answer("must never be used")]
         fake = StatefulFakeChatModel(responses=list(unused))
-        app.state.graph = build_graph(InMemorySaver(), llm=fake)
+        self.mount_graph(build_graph(InMemorySaver(), llm=fake))
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
@@ -113,7 +113,7 @@ class RoutePolicyTest(BaseAgentTest):
     async def test_stream_refuses_injection(self):
         """SSE refusal streams the explainer without touching the model."""
         self.reset_sse()
-        app.state.graph = self.make_graph([canned_answer("unused")])
+        self.mount_fake([canned_answer("unused")])
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
