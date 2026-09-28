@@ -1,0 +1,388 @@
+/**
+ * @title Kosply database schema
+ * @notice Single source of truth for Postgres tables.
+ * @dev Marketplace second-hand mahasiswa. Category masih String? (blank)
+ * @dev nanti jadi FK ke model Category. KTM image tidak pernah public,
+ * @dev hanya admin yang baca untuk verifikasi penjual.
+ */
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// @notice Role akun. BUYER = pembeli biasa, SELLER = mahasiswa terverifikasi, ADMIN = reviewer KTM.
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+/// @notice Status verifikasi penjual oleh admin.
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// @notice Keputusan admin atas pengajuan verifikasi ID. NONE = belum diputuskan.
+enum VerificationAction {
+  NONE
+  APPROVE
+  REJECT
+}
+
+/// @notice Status katalog produk.
+enum ProductStatus {
+  ACTIVE
+  SOLD
+  ARCHIVED
+}
+
+/// @notice Tipe pesan chat COD (langsung buyer <-> seller, tanpa payment gateway).
+enum MessageType {
+  TEXT
+  IMAGE
+  LOCATION
+  SYSTEM
+}
+
+/// @notice Status tiket support. ACTIVE = masih ditangani, CLOSED = selesai/non-aktif.
+enum SupportTicketStatus {
+  ACTIVE
+  CLOSED
+}
+
+/// @notice Kategori tiket support (dashboard filter).
+enum SupportTicketCategory {
+  AKUN
+  PRODUK
+  CHAT
+  VERIFIKASI
+  LAPORAN
+  LAINNYA
+}
+
+/// @notice Kategori laporan fraud katalog (pilihan di UI tombol Laporkan).
+enum ReportCategory {
+  PENIPUAN
+  BARANG_PALSU
+  BARANG_TIDAK_SESUAI
+  HARGA_MENYESATKAN
+  KONTEN_TIDAK_PANTAS
+  SPAM
+  LAINNYA
+}
+
+/// @notice Status laporan. PENDING = masuk, IN_REVIEW = diproses admin, RESOLVED/REJECTED = selesai.
+enum ReportStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+/// @notice Tindakan admin atas laporan: peringatan, hapus postingan, atau ban user.
+enum ReportAction {
+  NONE
+  WARNING
+  DELETE_PRODUCT
+  BAN_USER
+}
+
+/// @notice Akun dasar. Pembeda buyer vs seller ada di relasi SellerVerification + field role.
+model User {
+  id                    String               @id @default(cuid())
+  email                 String               @unique
+  username              String               @unique
+  name                  String
+  passwordHash          String
+  universitas           String
+  programStudi          String
+  bio                   String?              @db.Text /// bio lapak penjual, tampil di profil seller
+  role                  UserRole             @default(BUYER)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  sellerVerification    SellerVerification?
+  products              Product[]            @relation("SellerProducts")
+  buyerConversations    Conversation[]       @relation("BuyerConversations")
+  sellerConversations   Conversation[]       @relation("SellerConversations")
+  sentMessages          Message[]            @relation("SentMessages")
+  supportTickets        SupportTicket[]
+  supportMessagesSent   SupportMessage[]     @relation("SupportMessagesSent")
+  reportsMade           Report[]             @relation("ReportsMade")
+  reportsReceived       Report[]             @relation("ReportsReceived")
+  reportsReviewed       Report[]             @relation("ReportsReviewed")
+  verificationsReviewed SellerVerification[] @relation("VerificationsReviewed")
+  passwordResets        PasswordReset[]
+  aiConversations       AiConversation[]
+
+  @@map("users")
+}
+
+/// @notice Verifikasi ID penjual (KTM). Satu user satu pengajuan aktif.
+/// @dev ktmImageUrl simpan URL private storage, jangan expose ke /api/products.
+/// @dev Alur: status PENDING -> action APPROVE/REJECT oleh admin -> status APPROVED/REJECTED.
+/// @dev isActive = status aktif/non-aktif terpisah (APPROVED bisa dinonaktifkan lagi karena laporan fraud).
+model SellerVerification {
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  namaLengkap     String /// nama sesuai KTM, untuk audit (bisa beda dengan User.name display)
+  nim             String             @unique
+  universitas     String
+  programStudi    String
+  ktmImageUrl     String /// foto KTM, private — hanya admin
+  status          VerificationStatus @default(PENDING)
+  isActive        Boolean            @default(true) /// status aktif/non-aktif: false = dibekukan, tidak bisa jualan
+  action          VerificationAction @default(NONE) /// APPROVE | REJECT oleh admin (eksekusi di service/admin)
+  actionNote      String? /// alasan approve/reject
+  reviewedBy      String? /// admin yang memutuskan
+  reviewedByUser  User?              @relation("VerificationsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  rejectionReason String?
+  reviewedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status])
+  @@index([isActive])
+  @@map("seller_verifications")
+}
+
+/// @notice Katalog produk second-hand. Seller = User dengan role SELLER.
+/// @dev location di-set seller saat bikin katalog (titik jemput default).
+model Product {
+  id            String         @id @default(cuid())
+  sellerId      String
+  seller        User           @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Cascade)
+  title         String
+  description   String         @db.Text
+  price         Int /// rupiah, >= 0 (validasi di service/zod nanti)
+  stock         Int            @default(1) /// quantities / stok
+  imageUrls     String[]       @default([]) /// Image: 1..N URL, cover = imageUrls[0]
+  category      String? /// TODO: jadi FK ke Category — blank dulu
+  latitude      Float? /// lokasi barang, di-set saat bikin katalog
+  longitude     Float?
+  locationLabel String? /// label lokasi, mis. "Kos Jl. Mawar No. 10 / area kampus"
+  status        ProductStatus  @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  reports       Report[]
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([category])
+  @@map("products")
+}
+
+/// @notice Room chat COD per produk: 1 buyer x 1 product = 1 room.
+/// @dev Transaksi di luar sistem (COD langsung), chat hanya jembatan + history.
+/// @dev Titik COD final disepakati di chat (agreed*) — default ikut lokasi produk.
+model Conversation {
+  id                  String    @id @default(cuid())
+  productId           String? /// konteks produk yang ditawar, null = chat umum; SetNull agar history awet walau produk dihapus
+  product             Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  buyerId             String
+  buyer               User      @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId            String
+  seller              User      @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
+  agreedLatitude      Float? /// titik COD yang disepakati di conversation (null = ikut lokasi produk)
+  agreedLongitude     Float?
+  agreedLocationLabel String? /// label titik COD, mis. "Lobby kampus / Indomaret X"
+  lastMessageAt       DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  messages            Message[]
+
+  @@unique([productId, buyerId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@map("conversations")
+}
+
+/// @notice Satu bubble chat. Isi tergantung type: TEXT->text, IMAGE->imageUrl, LOCATION->lat/lng + label.
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  type           MessageType  @default(TEXT)
+  text           String?      @db.Text
+  imageUrl       String?
+  latitude       Float?
+  longitude      Float?
+  locationLabel  String?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+/// @notice Tiket bantuan user -> support. Nama/username diambil via relasi user (tanpa duplikasi).
+/// @dev Dashboard admin list tiket ini lalu buka conversation (SupportMessage) dengan bersangkutan.
+model SupportTicket {
+  id            String                @id @default(cuid())
+  ticketNo      String                @unique /// nomor tampil, mis. KSP-20260928-A1B2 (generate di service)
+  userId        String /// pelapor
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      SupportTicketCategory @default(LAINNYA)
+  status        SupportTicketStatus   @default(ACTIVE)
+  subject       String
+  description   String                @db.Text /// keluhan awal (jadi konteks, bukan chat)
+  lastMessageAt DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  messages      SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@map("support_tickets")
+}
+
+/// @notice Satu bubble chat support. Sender bisa pelapor (User) atau admin (role ADMIN).
+/// @dev isInternal = catatan antar-admin, jangan tampilkan ke pelapor.
+model SupportMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User          @relation("SupportMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  text       String        @db.Text
+  imageUrl   String? /// screenshot / bukti, opsional
+  isInternal Boolean       @default(false)
+  isRead     Boolean       @default(false)
+  readAt     DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([senderId])
+  @@map("support_messages")
+}
+
+/// @notice Laporan fraud dari katalog (tombol Laporkan di UI).
+/// @dev Minimal satu target terisi: reportedProductId (postingan) dan/atau reportedUserId (fraud/terlapor). Validasi di service.
+model Report {
+  id                String         @id @default(cuid())
+  reportNo          String         @unique /// nomor tampil, mis. RPT-20260928-A1B2 (generate di service)
+  reporterId        String /// pelapor
+  reporter          User           @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUserId    String? /// terlapor (fraud), null = hanya laporkan postingan
+  reportedUser      User?          @relation("ReportsReceived", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  reportedProductId String? /// postingan yang dilaporkan, null = hanya laporkan user
+  reportedProduct   Product?       @relation(fields: [reportedProductId], references: [id], onDelete: SetNull)
+  category          ReportCategory @default(LAINNYA)
+  description       String         @db.Text /// detail laporan dari UI
+  evidenceUrls      String[]       @default([]) /// screenshot / bukti chat, opsional
+  status            ReportStatus   @default(PENDING)
+  action            ReportAction   @default(NONE) /// WARNING | DELETE_PRODUCT | BAN_USER (eksekusi di service/admin)
+  actionNote        String? /// alasan admin atas tindakan
+  reviewedBy        String? /// admin yang menangani
+  reviewedByUser    User?          @relation("ReportsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([reportedProductId])
+  @@index([status])
+  @@index([category])
+  @@map("reports")
+}
+
+/// @notice Akun admin dashboard. Terpisah dari users (sesi dashboard vs marketplace tidak campur).
+/// @dev Login dashboard pakai email + passwordHash. Satu admin satu baris, nonaktifkan via isActive.
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  isActive     Boolean  @default(true) /// false = akses dashboard dicabut
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admins")
+}
+
+/// @notice OTP 4 digit untuk ganti password via verifikasi email.
+/// @dev Kode disimpan sebagai hash (jangan plain), satu pakai, kedaluwarsa ±10 menit.
+model PasswordReset {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String /// snapshot email tujuan (lookup cepat)
+  codeHash   String /// hash kode 4 digit, jangan plain
+  expiresAt  DateTime /// mis. now + 10 menit
+  attempts   Int       @default(0) /// hitung salah input, kunci setelah 5x
+  consumedAt DateTime? /// terisi = sudah dipakai, tidak bisa dipakai ulang
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([email])
+  @@map("password_resets")
+}
+
+/// @notice Sender role inside an AI chat session.
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+/// @notice AI chat session between a user and the AI. Resumable — reopen and continue anytime.
+/// @dev Title is auto-filled from the first message and editable afterwards.
+model AiConversation {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String /// session title, shown in the history list
+  lastMessageAt DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  messages      AiMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+/// @notice One message inside an AI chat session (human or AI side).
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           AiMessageRole  @default(USER)
+  content        String         @db.Text
+  model          String? /// AI model used for ASSISTANT messages, must match AiModel.modelId for cost tracking
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+/// @notice AI model registry. Admins add models here; chat uses AiModel.modelId.
+/// @dev Prices in USD per 1M tokens. Disable = isActive false (hidden from picker, history kept).
+model AiModel {
+  id             String   @id @default(cuid())
+  modelId        String   @unique /// code used in app, e.g. muse-spark-1.3
+  name           String /// display name, e.g. Muse Spark 1.3
+  inputPrice     Float /// USD per 1M input tokens
+  outputPrice    Float /// USD per 1M output tokens
+  cacheReadPrice Float    @default(0) /// USD per 1M cache-read tokens
+  isActive       Boolean  @default(true) /// false = disabled, cannot be selected for new chats
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("ai_models")
+}
