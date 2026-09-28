@@ -56,3 +56,12 @@ npx prisma studio
 - `ktmImageUrl` never leaves via `/api/products` — admin verification endpoint only.
 - `price >= 0`, `stock >= 0` validated in service/zod later (DB stores plain Int).
 - Separate DB per env: `kosply_dev` (local), `kosply_staging` (:3001), `kosply_main` (:3000).
+
+## Security (leak prevention + liveness)
+- `src/selects.js` holds the only whitelisted field sets; controllers import
+  them instead of hand-writing `select` (email, passwordHash, nim, KTM can
+  never leak through a new endpoint by accident).
+- `tests/selects.test.js` fails the suite if a sensitive column appears.
+- `config/db.js` (server side) degrades to `503 DB_UNAVAILABLE` instead of
+  crashing boot when the client or `DATABASE_URL` is missing.
+- Seed is idempotent (upserts) and DEV ONLY — hashes are markers, not credentials.

@@ -8,10 +8,12 @@
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "validate": "prisma validate",
-    "format": "prisma format"
+    "format": "prisma format",
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "^6.13.0"
+    "@prisma/client": "^6.13.0",
+    "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
     "prisma": "^6.13.0"
