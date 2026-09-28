@@ -31,6 +31,12 @@ func Registry() []Endpoint {
 	return []Endpoint{
 		{Method: "GET", Path: "/", Description: "Root health (name, status, env)"},
 		{Method: "GET", Path: "/api/health", Description: "Service health (uptime, timestamp)"},
+		{Method: "GET", Path: "/api/internal/products/search?q=", Description: "Catalog search (agent)"},
+		{Method: "GET", Path: "/api/internal/products/:id", Description: "Product detail (agent)"},
+		{Method: "GET", Path: "/api/internal/users/:id", Description: "Public user + role (agent)"},
+		{Method: "GET", Path: "/api/products", Description: "Public catalog"},
+		{Method: "GET", Path: "/api/products/:id", Description: "Public product detail"},
+		{Method: "GET", Path: "/api/models", Description: "Active AI models (selector)"},
 	}
 }
 

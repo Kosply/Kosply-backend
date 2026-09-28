@@ -112,8 +112,10 @@ Set `KOSPLY_ROOT` if auto-detection of the project root fails.
 See `lib/server-monitoring/README.md` for details.
 
 ## Next
-- DB (Prisma/Drizzle/Mongoose)
-- Auth (JWT)
+- ~~DB (Prisma)~~ done — `lib/db` + migrations + seed
+- ~~Auth (JWT), products, AI proxy~~ done — `/api/auth/*`, `/api/products*`, `/api/ai/*`
+- ~~Verification, COD chat, support, reports, admin, password reset, models~~ done — see `lib/server/WIRING.md`
 - Validation (zod)
 - Logger (pino)
-- `lib/agent/` (Python) + `lib/shared/` (contracts) — later, once the server is stable
+- Model selector flow UI → db → agent (see `lib/agent/agent_spec/tables/model_selector.md`)
+- Email delivery for OTP (currently dev-logged)

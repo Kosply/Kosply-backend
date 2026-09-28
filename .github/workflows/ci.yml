@@ -22,13 +22,56 @@ jobs:
       - name: Syntax check (node)
         run: |
           for f in lib/server/server.js lib/server/app.js lib/server/config/env.js \
-                   lib/server/routes/index.js lib/server/routes/health.route.js \
-                   lib/server/controllers/health.controller.js \
+                   lib/server/config/db.js lib/server/routes/index.js lib/server/routes/health.route.js \
+                   lib/server/routes/ai/ai.route.js lib/server/routes/ai/internal.route.js \
+                   lib/server/routes/auth/auth.route.js lib/server/routes/auth/password.route.js \
+                   lib/server/routes/products/product.route.js lib/server/routes/verifications/verification.route.js \
+                   lib/server/routes/chat/chat.route.js lib/server/routes/support/support.route.js \
+                   lib/server/routes/reports/report.route.js lib/server/routes/admin/admin.route.js \
+                   lib/server/routes/models/model.route.js lib/server/controllers/health.controller.js \
+                   lib/server/controllers/ai/ai.controller.js lib/server/controllers/ai/internal.controller.js \
+                   lib/server/controllers/auth/auth.controller.js lib/server/controllers/auth/password.controller.js \
+                   lib/server/controllers/products/product.controller.js \
+                   lib/server/controllers/verifications/verification.controller.js \
+                   lib/server/controllers/chat/chat.controller.js lib/server/controllers/support/support.controller.js \
+                   lib/server/controllers/reports/report.controller.js lib/server/controllers/admin/admin.controller.js \
+                   lib/server/controllers/models/model.controller.js lib/server/services/auth/auth.service.js \
+                   lib/server/services/auth/password.service.js lib/server/services/products/product.service.js \
+                   lib/server/services/ai/ai.service.js lib/server/services/verifications/verification.service.js \
+                   lib/server/services/chat/chat.service.js lib/server/services/support/support.service.js \
+                   lib/server/services/reports/report.service.js lib/server/services/admin/admin.service.js \
+                   lib/server/services/models/model.service.js lib/server/middlewares/auth/auth.js \
                    lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
-                   lib/server/middlewares/asyncHandler.js \
+                   lib/server/middlewares/asyncHandler.js lib/server/middlewares/errorCatalog.js \
+                   lib/server/tests/shared/errors.test.js lib/server/tests/ai/ai.test.js \
+                   lib/server/tests/ai/internal.test.js lib/server/tests/auth/auth.test.js \
+                   lib/server/tests/auth/password.test.js lib/server/tests/products/products.test.js \
+                   lib/server/tests/verifications/verification.test.js lib/server/tests/chat/chat.test.js \
+                   lib/server/tests/support/support.test.js lib/server/tests/reports/reports.test.js \
+                   lib/server/tests/admin/admin.test.js lib/server/tests/models/models.test.js \
+                   lib/db/src/selects.js lib/db/src/client.js \
+                   lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
+                   lib/server/middlewares/asyncHandler.js lib/server/middlewares/errorCatalog.js \
+                   lib/server/tests/errors.test.js lib/server/tests/internal.test.js \
+                   lib/server/tests/auth.test.js lib/server/tests/products.test.js \
+                   lib/server/tests/ai.test.js lib/server/tests/verification.test.js \
+                   lib/server/tests/chat.test.js lib/server/tests/support.test.js \
+                   lib/server/tests/reports.test.js lib/server/tests/admin.test.js \
+                   lib/db/src/selects.js lib/db/src/client.js \
+                   lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
+                   lib/server/middlewares/asyncHandler.js lib/server/middlewares/errorCatalog.js \
+                   lib/server/tests/errors.test.js lib/server/tests/internal.test.js \
+                   lib/server/tests/auth.test.js lib/server/tests/products.test.js \
+                   lib/server/tests/ai.test.js \
+                   lib/db/src/selects.js lib/db/src/client.js \
+                   lib/db/tests/selects.test.js lib/db/tests/client.test.js \
+                   lib/db/tests/schema.test.js lib/db/tests/seed.test.js \
+                   lib/db/prisma/seed.js \
                    ecosystem.config.js; do
             node --check "$f"
           done
+      - name: Unit tests (node:test, no DB)
+        run: npm test
       - name: Syntax check (shell)
         run: bash -n scripts/server.sh
       - name: Smoke test (boot + health)

@@ -16,11 +16,21 @@ without refactoring the project root.
 lib/server/
   server.js             # entrypoint: bind port + graceful shutdown
   app.js                # Express setup (global middleware, route mount)
-  config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN)
-  routes/               # index.js aggregator + *.route.js per module
-  controllers/          # per-module logic (req/res)
+  config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN, JWT_*, AI_AGENT_URL)
+  config/db.js          # lazy Prisma access (null-safe, 503 when down)
+  routes/<domain>/      # index.js aggregator + one folder per domain
+  controllers/<domain>/ # per-module logic (req/res)
+  services/<domain>/    # business logic (validation, Prisma, enforcement)
   middlewares/          # notFound (404), errorHandler (central), asyncHandler
+  middlewares/auth/     # JWT authenticate + requireRole
+  middlewares/errorCatalog.js  # error codes (add codes here, never inline)
+  tests/<domain>/       # node:test suites, no deps (`npm test`)
+  tests/shared/         # cross-cutting suites (error catalog + handlers)
 ```
+
+Domains: `auth` (incl. password reset), `products`, `ai` (incl. internal),
+`verifications`, `chat` (COD), `support`, `reports`, `admin`, `models`.
+Shared roots only: `health.*`, pipeline middlewares, `config/`.
 
 `server.js` binds the port; `app.js` only builds the app (no binding),
 so the app stays importable for tests and PM2 cluster mode stays
@@ -62,6 +72,58 @@ npm start               # single instance on :3000
 
 - `GET /` → `{ name, status, env }` (root health for PM2 / load balancer)
 - `GET /api/health` → `{ status, service, uptime, timestamp }`
+- `GET /api/internal/products/search?q=&limit=` → `{ status, items }` (agent)
+- `GET /api/internal/products/:id` → `{ status, item }` (agent)
+- `GET /api/internal/users/:id` → `{ status, item }` public fields only (agent)
+- `POST /api/internal/contact-requests` → `{ status: queued }` intake stub (agent)
+
+## Auth & products (public API)
+
+- `POST /api/auth/register` → buyer register, `{ user, token }` (201)
+- `POST /api/auth/login` → email + password login, `{ user, token }`
+- `GET /api/products` → public catalog (`q?`, `limit?`)
+- `GET /api/products/:id` → public detail
+- `POST /api/products` → seller create (JWT + role SELLER)
+- `PATCH /api/products/:id` → owner or ADMIN update
+- `DELETE /api/products/:id` → soft archive (owner or ADMIN)
+
+## Verification, chat, support, reports, admin, password, models
+
+- `POST /api/verifications` → submit KTM application (JWT)
+- `GET /api/verifications/me` → own application status
+- `GET /api/verifications` + `POST /api/verifications/:id/review` → ADMIN list + APPROVE/REJECT (approve promotes to SELLER)
+- `POST /api/conversations` → open/reuse COD room (`productId` or `sellerId`, optional first `message`)
+- `GET /api/conversations` → own inbox; `GET /:id` room; `POST /:id/messages` send; `GET /:id/messages` history (marks read)
+- `POST /api/support/tickets` → open (`category/subject/description`, `ticketNo KSP-…`); `GET` list; `GET /:id` detail (internal notes hidden); `POST /:id/messages` reply; `POST /:id/close`
+- `POST /api/reports` → file fraud (`RPT-…`); `GET /api/reports` + `POST /:id/review` ADMIN (WARNING / DELETE_PRODUCT archives / BAN_USER freezes seller)
+- `POST /api/admin/login` → dashboard login (separate `admins` table)
+- `POST /api/auth/forgot-password` → always 200, 4-digit OTP (`devCode` outside production until email delivery lands)
+- `POST /api/auth/reset-password` → verify code + set new password (single-use, 5 tries)
+- `GET /api/models` → active AI models for the Flutter selector
+- `POST/PATCH/DELETE /api/models` → ADMIN registry (delete refused when history references the model)
+
+Auth uses `Authorization: Bearer <token>` (`middlewares/auth.js`); login is
+email-only. Set a strong `JWT_SECRET` outside local dev.
+
+## AI proxy (single backend for Flutter)
+
+- `POST /api/ai/chat` → one turn (JWT identity forwarded, never body identity)
+- `POST /api/ai/chat/stream` → SSE piped from the agent
+- `POST /api/ai/chat/resume` → approve/reject passthrough
+- `GET /api/ai/conversations` → own session list (Flutter history list)
+- `GET /api/ai/history/:id` → history passthrough
+
+Needs `AI_AGENT_URL` (default `http://localhost:8000`); agent down gives
+`503 AGENT_UNAVAILABLE` while everything else keeps serving.
+
+Errors always carry a catalog `code` (`middlewares/errorCatalog.js`):
+`VALIDATION`, `PRODUCT_NOT_FOUND`, `USER_NOT_FOUND`, `DB_UNAVAILABLE`, …
+
+## Tests
+
+```bash
+npm test   # node:test, no deps; DB cases skip without DATABASE_URL
+```
 
 ## Adding a new module
 
