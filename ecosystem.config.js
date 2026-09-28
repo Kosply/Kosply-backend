@@ -22,6 +22,7 @@ module.exports = {
         NODE_ENV: 'staging',
         PORT: 3001,
         CORS_ORIGIN: '*',
+        DATABASE_URL: 'postgresql://kosply:kosply@localhost:5432/kosply_staging?schema=public',
       },
     },
     // MAIN: serves real users, must stay stable. Never test directly here.
@@ -39,6 +40,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         CORS_ORIGIN: '*',
+        DATABASE_URL: 'postgresql://kosply:kosply@localhost:5432/kosply_main?schema=public',
       },
     },
   ],
