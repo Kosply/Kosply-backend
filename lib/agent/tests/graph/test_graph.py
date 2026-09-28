@@ -1,6 +1,6 @@
 """Graph loop tests: plain answer, interrupt/approve/reject, memory across turns."""
 
-from .base_test import BaseAgentTest, canned_answer, canned_tool_call
+from tests.base_test import BaseAgentTest, canned_answer, canned_tool_call
 
 CONTACT_CALL = canned_tool_call(
     "request_seller_contact",

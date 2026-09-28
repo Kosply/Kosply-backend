@@ -4,7 +4,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 
-from .base_test import BaseAgentTest, canned_answer, canned_tool_call
+from tests.base_test import BaseAgentTest, canned_answer, canned_tool_call
 
 
 class ApiTest(BaseAgentTest):

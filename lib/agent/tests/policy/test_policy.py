@@ -79,7 +79,8 @@ class PromptWiringTest(BaseAgentTest):
         await self.loop(graph, [("send", "halo")])
         first = fake.seen_inputs[0][0]
         self.assertEqual(first.type, "system")
-        self.assertEqual(first.content, SYSTEM_PROMPT)
+        self.assertTrue(first.content.startswith(SYSTEM_PROMPT))
+        self.assertIn("[MODE: UMUM]", first.content)
 
     def test_ensure_is_idempotent(self):
         """Prepending twice still leaves exactly one system prompt."""
