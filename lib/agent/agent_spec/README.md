@@ -2,7 +2,7 @@
 
 Source: `lib/agent/` (FastAPI + LangGraph 1.2, basic). Status: **implemented** —
 everything below exists in code, compiles, and is covered by `pytest tests/`
-(54 passed, 2 skipped e2e; stateful fake only, no real AI; mirror + e2e verified live on Postgres).
+(54 passed, 3 skipped opt-in e2e; fakes by default, real model only under `E2E_LIVE_AI=1`; mirror + e2e verified live on Postgres).
 
 ## Feature index
 
