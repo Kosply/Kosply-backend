@@ -33,8 +33,8 @@ lib/agent/
     agent/                # LangGraph layer
       state.py            # AgentState(MessagesState) — history reducer, enables resume
       graph.py            # agent -> human_approval -> tools, compiled with checkpointer
-      policy/             # rules.py (scope+injection), guard.py (pre-check+prompt)
-                          # personas.py (SELLER/BUYER modes by caller role)
+      policy/             # system_prompt.md (scope text), rules.py (injection patterns)
+                          # guard.py (pre-check+prompt), personas.py (SELLER/BUYER modes)
       tools/              # basic tools: catalog.py (read-only), contact.py (sensitive)
                           # roles.py (get_user_role, plain)
       memory/             # checkpointer.py (Postgres persistent, memory fallback)
@@ -65,7 +65,7 @@ uvicorn app.main:app --port 8000
 - `tests/message/` — all stateful-message tests (fake model, canned shapes).
 - `tests/loop/` — loop-runner tests (outcomes, bad steps, thread isolation).
 - `tests/security/` — rate limit, body cap, bounded runs/streams.
-- `tests/e2e/` — live wiring vs real server+DB (opt-in `E2E_LIVE=1`).
+- `tests/e2e/` — live wiring vs real server+DB (opt-in `E2E_LIVE=1`) + full lifecycle vs real model (opt-in `E2E_LIVE_AI=1`).
 
 ## Endpoints
 

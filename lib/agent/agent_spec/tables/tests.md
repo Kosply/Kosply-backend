@@ -27,6 +27,8 @@ category; shared kit stays at `tests/base_test.py`.
 | `tests/streaming/test_streaming.py` | thinking SSE | `thinking` event precedes the `token` |
 | `tests/personas/test_personas.py` | mapping + wiring | seller/buyer/neutral modes reach the model; persist across turns |
 | `tests/personas/test_personas.py` | route role | `POST /ai/chat` accepts `role` end to end |
+| `tests/e2e/test_live_wiring.py` | live tools (opt-in `E2E_LIVE=1`) | search/detail hit the real server+DB; 404 surfaces as `ToolError` |
+| `tests/e2e/test_live_lifecycle.py` | full lifecycle (opt-in `E2E_LIVE_AI=1`) | message → catalog tool → interrupt → approve → fresh instance remembers; temp user cleaned up |
 
 ## Test-only notes
 
