@@ -13,22 +13,27 @@ under `thread_id` (= conversation id) and can be resumed later.
 """
 
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import RemoveMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Command, interrupt
 
+from .memory.compaction import needs_compaction, summarize_history
 from .state import AgentState
 from .tools import SENSITIVE_TOOLS, TOOLS
 from app.agent.policy.guard import ensure_system_prompt
 
 
-def build_graph(checkpointer: object, model_name: str = "", llm: object = None):
+def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
+                *, compaction_max_messages: int = 30, compaction_threshold_pct: float = 75.0,
+                compaction_context_total: int = 32000, compaction_keep_recent: int = 6):
     """Compile the agent graph. The real model inits lazily on first use.
 
     Pass `llm` (e.g. a stateful fake in tests) to skip `init_chat_model`.
     Lazy init keeps boot green without provider keys; failures surface
     per-request as ModelError instead of crashing the process.
+    Compaction budgets bound history size for small-window models.
     """
     bound = {"llm": llm.bind_tools(TOOLS) if llm is not None else None}
 
@@ -38,9 +43,18 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None):
         return bound["llm"]
 
     async def agent(state: AgentState) -> dict:
-        """LLM node: answer or emit tool calls (Kosply scope + role persona)."""
+        """LLM node: compact when over budget, then answer or emit tool calls."""
         role = state.get("user_role", "UNKNOWN")
-        response = await _llm().ainvoke(ensure_system_prompt(state["messages"], role))
+        messages = state["messages"]
+        if needs_compaction(messages, max_messages=compaction_max_messages,
+                            threshold_pct=compaction_threshold_pct,
+                            context_total=compaction_context_total):
+            cutoff = max(len(messages) - compaction_keep_recent, 0)
+            summary = await summarize_history(messages[:cutoff] or messages, _llm())
+            kept = messages[cutoff:]
+            response = await _llm().ainvoke(ensure_system_prompt([summary, *kept], role))
+            return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), summary, *kept, response]}
+        response = await _llm().ainvoke(ensure_system_prompt(messages, role))
         return {"messages": [response]}
 
     def human_approval(state: AgentState) -> Command:

@@ -39,6 +39,8 @@ lib/agent/
                           # roles.py (get_user_role, plain)
       memory/             # checkpointer.py (Postgres persistent, memory fallback)
                           # history_store.py (mirror turns into ai_conversations/ai_messages)
+                          # compaction.py (auto-summarize old turns for small windows)
+      models/             # registry.py (provider context-window lookup, cached)
 ```
 
 ## Run

@@ -51,6 +51,10 @@ class Settings:
     max_inflight: int
     model_timeout_s: float
     queue_timeout_s: float
+    compaction_max_messages: int
+    compaction_threshold_pct: float
+    compaction_context_total: int
+    compaction_keep_recent: int
 
 
 def _parse_int(raw: str | None, fallback: int) -> int:
@@ -83,6 +87,10 @@ def load_settings() -> Settings:
         max_inflight=_parse_int(os.getenv("AI_MAX_INFLIGHT"), 50),
         model_timeout_s=_parse_float(os.getenv("AI_MODEL_TIMEOUT_S"), 120.0),
         queue_timeout_s=_parse_float(os.getenv("AI_QUEUE_TIMEOUT_S"), 5.0),
+        compaction_max_messages=_parse_int(os.getenv("AI_COMPACTION_MAX_MESSAGES"), 30),
+        compaction_threshold_pct=_parse_float(os.getenv("AI_COMPACTION_THRESHOLD_PCT"), 75.0),
+        compaction_context_total=_parse_int(os.getenv("AI_CONTEXT_WINDOW_TOTAL"), 0),
+        compaction_keep_recent=_parse_int(os.getenv("AI_COMPACTION_KEEP_RECENT"), 6),
     )
 
 

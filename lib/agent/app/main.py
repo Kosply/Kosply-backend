@@ -2,6 +2,8 @@
 
 from contextlib import asynccontextmanager
 
+import os
+
 import uvicorn
 from fastapi import FastAPI
 
@@ -21,7 +23,24 @@ async def lifespan(app: FastAPI):
 
     saver, close_saver = await create_saver()
     try:
-        app.state.graph = build_graph(checkpointer=saver, model_name=settings.ai_model)
+        from app.agent.models import resolve_context_total
+
+        total = resolve_context_total(
+            settings.ai_model,
+            explicit=settings.compaction_context_total,
+            base_url=os.getenv("OPENAI_BASE_URL", ""),
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+        )
+        print(f"[agent] context window: {total} tokens "
+              f"(threshold {settings.compaction_threshold_pct}%)")
+        app.state.graph = build_graph(
+            checkpointer=saver,
+            model_name=settings.ai_model,
+            compaction_max_messages=settings.compaction_max_messages,
+            compaction_threshold_pct=settings.compaction_threshold_pct,
+            compaction_context_total=total,
+            compaction_keep_recent=settings.compaction_keep_recent,
+        )
         app.state.saver = saver
         app.state.inflight = asyncio.Semaphore(settings.max_inflight)
         yield
