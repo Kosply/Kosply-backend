@@ -23,6 +23,9 @@ class Verdict:
     reason: str = ""
 
 
+SCOPE_ID = "kosply-scope"
+
+
 def reply_for(reason: str) -> str:
     """User-facing text for a rejection reason."""
     return {
@@ -47,7 +50,7 @@ def check_user_message(text: str | None) -> Verdict:
 
 
 def ensure_system_prompt(messages: list, role: str | None = "UNKNOWN") -> list:
-    """Prepend the Kosply scope + role persona once (kept via checkpoints)."""
-    if any(getattr(m, "type", "") == "system" for m in messages):
+    """Prepend the Kosply scope + role persona once (id-tagged, survives compaction)."""
+    if any(getattr(m, "id", "") == SCOPE_ID for m in messages):
         return messages
-    return [SystemMessage(content=build_system_prompt(SYSTEM_PROMPT, role)), *messages]
+    return [SystemMessage(content=build_system_prompt(SYSTEM_PROMPT, role), id=SCOPE_ID), *messages]
