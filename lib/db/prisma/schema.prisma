@@ -15,11 +15,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// @notice Account role. BUYER = regular customer, SELLER = verified student, ADMIN = KTM reviewer.
+/// @notice Account role. BUYER = regular customer, SELLER = verified student,
+/// @notice ADMIN = dashboard operator, SUPER_ADMIN = manages admins.
 enum UserRole {
   BUYER
   SELLER
   ADMIN
+  SUPER_ADMIN
 }
 
 /// @notice Seller verification status decided by an admin.
@@ -100,10 +102,14 @@ model User {
   email                 String               @unique
   username              String               @unique
   name                  String
-  passwordHash          String
+  passwordHash       String
+  googleId           String?            @unique /// Google sub (direct auth link)
+  appleId            String?            @unique /// Apple sub (direct auth link)
   universitas           String
   programStudi          String
   bio                   String?              @db.Text /// seller storefront bio, shown on the seller profile
+  photo                 String? /// avatar URL (client uploads elsewhere, stores the URL here)
+  isActive              Boolean              @default(true) /// false = login blocked (frozen by super admin)
   role                  UserRole             @default(BUYER)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
@@ -120,6 +126,8 @@ model User {
   verificationsReviewed SellerVerification[] @relation("VerificationsReviewed")
   passwordResets        PasswordReset[]
   aiConversations       AiConversation[]
+  notifications         Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
 }
@@ -331,6 +339,38 @@ model PasswordReset {
   @@index([userId])
   @@index([email])
   @@map("password_resets")
+}
+
+/// @notice Per-user notification (in-app inbox).
+/// @dev Rows are created by services on key events (chat, verification,
+/// @dev reports, support) only when the matching preference is enabled.
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String /// event group: chat | verification | reports | support | product | system
+  title     String
+  body      String   @db.Text
+  data      Json? /// deep-link payload, e.g. { conversationId, productId }
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+/// @notice Per-user notification toggle. Missing row = enabled (opt-out model).
+model NotificationPreference {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String /// one of chat | verification | reports | support | product | system
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@map("notification_preferences")
 }
 
 /// @notice Sender role inside an AI chat session.
