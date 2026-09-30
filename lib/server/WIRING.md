@@ -7,8 +7,8 @@ Which box owns what, and what is reachable from the server today.
 
 | Table | Server endpoint(s) | Agent use | Status |
 |---|---|---|---|
-| `users` | `POST /api/auth/*`, `GET /api/internal/users/:id` | role lookup, persona | ✅ wired |
-| `products` | `/api/products*` (public + seller), `/api/internal/products/*` | catalog tools | ✅ wired |
+| `users` | `POST /api/auth/*`, `GET /api/users/me\|:id`, `PATCH /api/users/me`, `GET /api/internal/users/:id` | role lookup, persona | ✅ wired |
+| `products` | `/api/products*` (public + seller, COD location writable), `/api/internal/products/*` | catalog tools | ✅ wired |
 | `ai_conversations` | `GET /api/ai/conversations` (list), `GET /api/ai/history/:id` (via agent) | thread resume | ✅ wired |
 | `ai_messages` | `GET /api/ai/history/:id` (via agent) | history render | ✅ wired |
 | `seller_verifications` | `POST/GET /api/verifications*` (submit/me/list/review) | seller gating context | ✅ wired |
@@ -16,6 +16,8 @@ Which box owns what, and what is reachable from the server today.
 | `support_tickets` + `support_messages` | `/api/support/tickets*` (open/list/detail/reply/close) | escalation target | ✅ wired |
 | `reports` | `/api/reports*` (file/list/review + enforcement) | fraud context | ✅ wired |
 | `admins` | `POST /api/admin/login` | dashboard auth | ✅ wired |
+| `users` (segmentation) | `POST/PATCH /api/admin/users*` (SUPER_ADMIN), `PATCH /api/admin/users/me` (photo/name/username, password locked) | — | ✅ wired |
+| `notifications` + `notification_preferences` | `/api/notifications*` (inbox, read, free toggles) | — | ✅ wired |
 | `password_resets` | `POST /api/auth/forgot-password|reset-password` | — | ✅ wired |
 | `ai_models` | `GET /api/models` + ADMIN CRUD | selector source (client wiring TODO) | ✅ wired |
 
@@ -35,6 +37,7 @@ Which box owns what, and what is reachable from the server today.
 | `POST /api/ai/chat` | `POST /ai/chat` | ✅ wired (status passthrough) |
 | `POST /api/ai/chat/stream` | `POST /ai/chat/stream` | ✅ wired (SSE piped) |
 | `POST /api/ai/chat/resume` | `POST /ai/chat/resume` | ✅ wired |
+| `GET /api/ai/wait/:id` | `GET /ai/wait/:id` | ✅ wired (long-poll; needs background app for long waits) |
 | `GET /api/ai/history/:id` | `GET /ai/history/:id` | ✅ wired |
 | `GET /api/ai/conversations` | Prisma direct (no agent hop) | ✅ wired |
 

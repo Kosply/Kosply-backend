@@ -81,13 +81,15 @@ npm start               # single instance on :3000
 
 - `POST /api/auth/register` → buyer register, `{ user, token }` (201)
 - `POST /api/auth/login` → email + password login, `{ user, token }`
+- `POST /api/auth/google` → direct Google (`idToken`), `{ user, token, onboardingRequired, isNew }`
+- `POST /api/auth/apple` → direct Apple (`identityToken` + names), same shape — **disabled by default** (`APPLE_LOGIN_ENABLED=true` when iOS ships; needs paid Apple Developer)
 - `GET /api/products` → public catalog (`q?`, `limit?`)
 - `GET /api/products/:id` → public detail
 - `POST /api/products` → seller create (JWT + role SELLER)
 - `PATCH /api/products/:id` → owner or ADMIN update
 - `DELETE /api/products/:id` → soft archive (owner or ADMIN)
 
-## Verification, chat, support, reports, admin, password, models
+## Verification, chat, support, reports, admin, password, models, users, notifications
 
 - `POST /api/verifications` → submit KTM application (JWT)
 - `GET /api/verifications/me` → own application status
@@ -97,6 +99,11 @@ npm start               # single instance on :3000
 - `POST /api/support/tickets` → open (`category/subject/description`, `ticketNo KSP-…`); `GET` list; `GET /:id` detail (internal notes hidden); `POST /:id/messages` reply; `POST /:id/close`
 - `POST /api/reports` → file fraud (`RPT-…`); `GET /api/reports` + `POST /:id/review` ADMIN (WARNING / DELETE_PRODUCT archives / BAN_USER freezes seller)
 - `POST /api/admin/login` → dashboard login (separate `admins` table)
+- `PATCH /api/admin/users/me` → own photo/name/username (password locked)
+- `POST /api/admin/users` + `PATCH /api/admin/users/:id` → SUPER_ADMIN manages admins (incl. freeze via `isActive`)
+- `GET /api/users/me` + `PATCH /api/users/me` → own profile (name/username/bio/photo)
+- `GET /api/users/:id` → public profile
+- `GET /api/notifications` + `/preferences` + `POST /:id/read|read-all` + `PATCH /preferences` → personal inbox, free toggles
 - `POST /api/auth/forgot-password` → always 200, 4-digit OTP (`devCode` outside production until email delivery lands)
 - `POST /api/auth/reset-password` → verify code + set new password (single-use, 5 tries)
 - `GET /api/models` → active AI models for the Flutter selector
@@ -110,11 +117,18 @@ email-only. Set a strong `JWT_SECRET` outside local dev.
 - `POST /api/ai/chat` → one turn (JWT identity forwarded, never body identity)
 - `POST /api/ai/chat/stream` → SSE piped from the agent
 - `POST /api/ai/chat/resume` → approve/reject passthrough
+- `GET /api/ai/wait/:id?timeout=N` → long-poll a pending approval (1..1500 s)
 - `GET /api/ai/conversations` → own session list (Flutter history list)
 - `GET /api/ai/history/:id` → history passthrough
 
 Needs `AI_AGENT_URL` (default `http://localhost:8000`); agent down gives
 `503 AGENT_UNAVAILABLE` while everything else keeps serving.
+
+`server.js` sets `requestTimeout`/`headersTimeout` to 0 so Node does not cut a
+long wait; a reverse proxy in front must raise its own limits. `/api/ai/wait`
+only works while the phone stays alive: see the background-wait notes in
+`lib/agent/agent_spec/tables/human_in_the_loop.md` (Android foreground service,
+iOS background mode + push).
 
 Errors always carry a catalog `code` (`middlewares/errorCatalog.js`):
 `VALIDATION`, `PRODUCT_NOT_FOUND`, `USER_NOT_FOUND`, `DB_UNAVAILABLE`, …
