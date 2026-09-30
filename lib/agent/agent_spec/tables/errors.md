@@ -1,6 +1,6 @@
 # errors — implemented
 
-File: `app/core/errors.py`. One hierarchy, one handler registration —
+File: `app/core/errors/errors.py`. One hierarchy, one handler registration —
 routes only raise, never format responses.
 
 | Class | HTTP | When |

@@ -33,7 +33,7 @@ async def _connect():
     """Open a short-lived async connection (basic: one per call)."""
     from psycopg import AsyncConnection
 
-    from app.core.dsn import pg_dsn
+    from app.core.config import pg_dsn
 
     return await AsyncConnection.connect(pg_dsn(settings.database_url))
 

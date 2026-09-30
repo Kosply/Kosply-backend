@@ -1,6 +1,6 @@
 # streaming — implemented
 
-File: `app/api/streaming.py`. One graph run, two stream modes multiplexed:
+File: `app/api/chat/streaming.py`. One graph run, two stream modes multiplexed:
 `messages` (tokens) + `updates` (interrupts).
 
 | Event | Payload | When |

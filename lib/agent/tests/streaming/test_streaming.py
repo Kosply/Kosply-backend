@@ -3,7 +3,7 @@
 from httpx import ASGITransport, AsyncClient
 from langchain_core.messages import AIMessageChunk
 
-from app.api.streaming import split_thinking
+from app.api.chat.streaming import split_thinking
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel
 from langchain_core.messages import AIMessage

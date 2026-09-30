@@ -1,6 +1,6 @@
 # personas — implemented
 
-File: `app/agent/policy/personas.py`. The agent reads the caller role and
+File: `app/agent/policy/personas/` (`personas.py`). The agent reads the caller role and
 switches personality: seller mode vs buyer mode.
 
 | Role | Persona | Helps with |

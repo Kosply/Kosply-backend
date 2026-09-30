@@ -5,7 +5,7 @@ import time
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.core.ratelimit import RateLimiter, rate_limit_middleware
+from app.core.limits import RateLimiter, rate_limit_middleware
 from tests.base_test import BaseAgentTest
 
 

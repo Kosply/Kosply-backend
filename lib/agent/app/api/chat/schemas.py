@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas for the agent HTTP API."""
+"""Chat endpoint schemas: request turns, approvals, answers with callbacks."""
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,10 @@ class ChatRequest(BaseModel):
         description="Caller role for the persona (BUYER / SELLER); Flutter sends it from login.",
     )
     message: str
+    ui_state: dict | None = Field(
+        default=None,
+        description="Flutter screen snapshot (screen, visible ids, selection, filters).",
+    )
 
 
 class ResumeRequest(BaseModel):
@@ -27,21 +31,11 @@ class ResumeRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Final assistant answer for one turn."""
+    """Final assistant answer for one turn, plus UI callbacks to execute."""
 
     conversation_id: str
     answer: str
-
-
-class HistoryMessage(BaseModel):
-    """One stored message (for resume rendering in Flutter)."""
-
-    role: str
-    content: str
-
-
-class HistoryResponse(BaseModel):
-    """Full stored history of a session."""
-
-    conversation_id: str
-    messages: list[HistoryMessage]
+    callbacks: list = Field(
+        default_factory=list,
+        description="Ordered {callback, args} payloads from perform_callback for Flutter.",
+    )

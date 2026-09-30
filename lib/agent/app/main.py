@@ -9,11 +9,10 @@ from fastapi import FastAPI
 
 from app.agent.graph import build_graph
 from app.agent.memory import create_saver
-from app.api.routes import router
-from app.core.caps import body_cap_middleware
+from app.api import router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
-from app.core.ratelimit import RateLimiter, rate_limit_middleware
+from app.core.limits import RateLimiter, body_cap_middleware, rate_limit_middleware
 
 
 @asynccontextmanager

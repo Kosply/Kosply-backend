@@ -13,3 +13,4 @@ class AgentState(MessagesState, total=False):
 
     user_id: str
     user_role: str
+    ui_state: dict

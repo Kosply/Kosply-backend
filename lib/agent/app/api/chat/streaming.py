@@ -4,6 +4,8 @@ Events emitted:
 - `token`     — one LLM answer chunk (`{"text": ...}`).
 - `thinking`  — one reasoning-model thinking chunk (`{"text": ...}`), kept
   separate so Flutter can render it collapsed/hidden.
+- `callback`  — one UI action payload (`{"callback": ..., "args": {...}}`)
+  for Flutter to execute immediately.
 - `interrupt` — graph paused for approval (`{"pending": [...]}`); the client
   must call POST /ai/chat/resume. The stream ends right after this event.
 - `done`      — turn finished.
@@ -70,12 +72,14 @@ def split_thinking(chunk: Any) -> tuple:
 
 
 async def stream_chat_events(
-    graph: Any, *, message: str, user_id: str, conversation_id: str, role: str = "UNKNOWN"
+    graph: Any, *, message: str, user_id: str, conversation_id: str,
+    role: str = "UNKNOWN", ui_state: dict | None = None,
 ) -> AsyncIterator[dict]:
     """Yield SSE-ready dicts for EventSourceResponse."""
     config = {"configurable": {"thread_id": conversation_id}}
     async for mode, chunk in graph.astream(
-        {"messages": [HumanMessage(content=message)], "user_id": user_id, "user_role": role},
+        {"messages": [HumanMessage(content=message)], "user_id": user_id,
+         "user_role": role, "ui_state": ui_state or {}},
         config,
         stream_mode=["messages", "updates"],
     ):
@@ -86,8 +90,28 @@ async def stream_chat_events(
                 yield {"event": "thinking", "data": _payload({"text": thinking})}
             if text:
                 yield {"event": "token", "data": _payload({"text": text})}
-        elif mode == "updates" and isinstance(chunk, dict) and "__interrupt__" in chunk:
-            pending = [getattr(i, "value", None) for i in chunk["__interrupt__"]]
-            yield {"event": "interrupt", "data": _payload({"pending": pending})}
-            return
+        elif mode == "updates" and isinstance(chunk, dict):
+            if "__interrupt__" in chunk:
+                pending = [getattr(i, "value", None) for i in chunk["__interrupt__"]]
+                yield {"event": "interrupt", "data": _payload({"pending": pending})}
+                return
+            for callback in _updates_callbacks(chunk):
+                yield {"event": "callback", "data": _payload(callback)}
     yield {"event": "done", "data": _payload({"ok": True})}
+
+
+def _updates_callbacks(chunk: dict) -> list:
+    """Collect perform_callback payloads from a stream update chunk."""
+    found = []
+    for update in chunk.values():
+        messages = update.get("messages", []) if isinstance(update, dict) else []
+        for msg in messages:
+            if getattr(msg, "type", "") != "tool" or getattr(msg, "name", "") != "perform_callback":
+                continue
+            try:
+                payload = json.loads(msg.content) if isinstance(msg.content, str) else {}
+            except (ValueError, TypeError):
+                continue
+            if isinstance(payload, dict) and payload.get("callback"):
+                found.append({"callback": payload["callback"], "args": payload.get("args", {})})
+    return found

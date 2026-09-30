@@ -4,9 +4,12 @@ from httpx import ASGITransport, AsyncClient
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
-from app.agent.policy.guard import ensure_system_prompt
-from app.agent.policy.personas import build_system_prompt, persona_for
-from app.agent.policy.rules import SYSTEM_PROMPT
+from app.agent.policy import (
+    SYSTEM_PROMPT,
+    build_system_prompt,
+    ensure_system_prompt,
+    persona_for,
+)
 from app.agent.tools import TOOLS, get_user_role
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel, canned_answer

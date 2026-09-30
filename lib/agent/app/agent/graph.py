@@ -19,10 +19,10 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Command, interrupt
 
-from .memory.compaction import needs_compaction, summarize_history
+from .memory import needs_compaction, summarize_history
 from .state import AgentState
 from .tools import SENSITIVE_TOOLS, TOOLS
-from app.agent.policy.guard import ensure_system_prompt
+from app.agent.policy import ensure_system_prompt
 
 
 def build_graph(checkpointer: object, model_name: str = "", llm: object = None,

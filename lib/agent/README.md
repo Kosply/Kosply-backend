@@ -20,26 +20,20 @@ lib/agent/
   agent_spec/             # feature specs in tables (mirror of implementation)
   app/
     main.py               # entrypoint: lifespan (memory setup + graph compile) + routes
-    core/                 # cross-cutting: config, errors
-      config.py           # env loader (strict PORT, like lib/server/config/env.js)
-      dsn.py              # pg_dsn: strip Prisma-only params (?schema=) for raw drivers
-      errors.py           # AgentError hierarchy + handlers (409 = needs approval)
-      ratelimit.py        # sliding-window limiter + /ai/* middleware (429)
-      caps.py             # body cap (413), bounded runs (503/504), stream slots
-    api/                  # HTTP layer
-      routes.py           # /health, /ai/chat, /ai/chat/stream, /ai/chat/resume, /ai/history/:id
-      schemas.py          # pydantic request/response
-      streaming.py        # SSE: token / interrupt / done events
+    core/                 # cross-cutting, one folder per function
+      config/             # config.py (strict env loader) + dsn.py (pg_dsn for raw drivers)
+      errors/             # errors.py (AgentError hierarchy + handlers)
+      limits/             # ratelimit.py (429) + caps.py (413 body cap, 503/504 bounded runs)
+    api/                  # HTTP layer, one folder per function (+ shared.py helpers)
+      chat/               # routes.py (chat/stream/resume/wait), schemas.py, streaming.py (SSE)
+      history/            # routes.py + schemas.py (stored session reads)
+      health/             # routes.py (liveness + readiness probes)
     agent/                # LangGraph layer
       state.py            # AgentState(MessagesState) — history reducer, enables resume
       graph.py            # agent -> human_approval -> tools, compiled with checkpointer
-      policy/             # system_prompt.md (scope text), rules.py (injection patterns)
-                          # guard.py (pre-check+prompt), personas.py (SELLER/BUYER modes)
-      tools/              # basic tools: catalog.py (read-only), contact.py (sensitive)
-                          # roles.py (get_user_role, plain)
-      memory/             # checkpointer.py (Postgres persistent, memory fallback)
-                          # history_store.py (mirror turns into ai_conversations/ai_messages)
-                          # compaction.py (auto-summarize old turns for small windows)
+      policy/             # scope/ (system_prompt.md, rules.py, guard.py) + personas/ (SELLER/BUYER)
+      tools/              # registry.py + one folder per group: catalog, chat, contact, roles, ui
+      memory/             # checkpoint/ (persistent saver), history/ (db mirror), compaction/ (summaries)
       models/             # registry.py (provider context-window lookup, cached)
 ```
 
@@ -68,6 +62,8 @@ uvicorn app.main:app --port 8000
 - `tests/loop/` — loop-runner tests (outcomes, bad steps, thread isolation).
 - `tests/security/` — rate limit, body cap, bounded runs/streams.
 - `tests/e2e/` — live wiring vs real server+DB (opt-in `E2E_LIVE=1`) + full lifecycle vs real model (opt-in `E2E_LIVE_AI=1`).
+- `tests/ui/` — screen reading + callback responses/events.
+- `tests/tools/` — catalog price/category filters (mocked HTTP).
 
 ## Endpoints
 
@@ -77,6 +73,7 @@ uvicorn app.main:app --port 8000
 | POST | `/ai/chat` | one turn; `409 needs_approval` when a sensitive tool fires |
 | POST | `/ai/chat/stream` | SSE: `token` / `thinking` / `interrupt` / `done` |
 | POST | `/ai/chat/resume` | `{approve: bool}` continues after an interrupt |
+| GET | `/ai/wait/:conversation_id` | `?timeout=1..1500` long-polls a pending approval → `{status, answer, remainingS}` |
 | GET | `/ai/history/:id` | stored messages (resume rendering in Flutter) |
 
 Resume key = `thread_id` = `conversation_id` = `ai_conversations.id`

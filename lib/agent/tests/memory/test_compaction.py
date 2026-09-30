@@ -2,7 +2,7 @@
 
 from langchain_core.messages import HumanMessage
 
-from app.agent.memory.compaction import (
+from app.agent.memory import (
     count_tokens,
     estimate_tokens,
     needs_compaction,

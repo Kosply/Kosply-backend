@@ -1,6 +1,6 @@
 # compaction — implemented
 
-File: `app/agent/memory/compaction.py` (+ `agent` node hook in `graph.py`).
+File: `app/agent/memory/compaction/` (`compaction.py`, + `agent` node hook in `graph.py`).
 Auto-shrinks long threads so small-window models stop blowing up: older
 turns become one summary, recent turns stay verbatim.
 

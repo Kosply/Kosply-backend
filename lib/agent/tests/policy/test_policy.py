@@ -2,8 +2,13 @@
 
 from httpx import ASGITransport, AsyncClient
 
-from app.agent.policy.guard import check_user_message, ensure_system_prompt, reply_for
-from app.agent.policy.rules import REJECTION_MESSAGE, SYSTEM_PROMPT
+from app.agent.policy import (
+    REJECTION_MESSAGE,
+    SYSTEM_PROMPT,
+    check_user_message,
+    ensure_system_prompt,
+    reply_for,
+)
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel, canned_answer
 from app.agent.graph import build_graph

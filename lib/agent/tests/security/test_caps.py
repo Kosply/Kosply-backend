@@ -5,8 +5,8 @@ import asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.core.caps import body_cap_middleware, run_guarded, stream_guarded
 from app.core.errors import ModelTimeout, ServerBusy
+from app.core.limits import body_cap_middleware, run_guarded, stream_guarded
 from tests.base_test import BaseAgentTest
 
 

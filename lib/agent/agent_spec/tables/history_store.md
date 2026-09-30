@@ -1,6 +1,6 @@
 # history-store — implemented
 
-File: `app/agent/memory/history_store.py`. Connects `lib/agent` ↔ `lib/db`:
+File: `app/agent/memory/history/` (`history_store.py`). Connects `lib/agent` ↔ `lib/db`:
 every finished turn is mirrored into the shared tables, and resume/history
 reads from them first.
 

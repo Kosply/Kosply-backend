@@ -3,8 +3,8 @@
 from types import SimpleNamespace
 from unittest import mock
 
-from app.agent.memory import history_store
-from app.agent.memory.history_store import sync_turn, to_db_role
+from app.agent.memory.history import history_store
+from app.agent.memory import sync_turn, to_db_role
 from tests.base_test import BaseAgentTest
 
 OFF_SETTINGS = SimpleNamespace(database_url=None)

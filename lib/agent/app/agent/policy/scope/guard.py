@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 
-from .personas import build_system_prompt
+from ..personas import build_system_prompt
 from .rules import (
     EMPTY_MESSAGE,
     INJECTION_PATTERNS,

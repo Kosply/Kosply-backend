@@ -7,8 +7,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from app.core.config import settings
-from app.core.dsn import pg_dsn
+from app.core.config import pg_dsn, settings
 from app.core.errors import MemoryError
 
 CloseSaver = Callable[..., Awaitable[None]]

@@ -1,9 +1,27 @@
 """Agent tools, grouped by function. All tools are basic on purpose."""
 
-from .catalog import get_product_detail, search_catalog
-from .contact import request_seller_contact
-from .roles import get_user_role
+from .registry import (
+    SENSITIVE_TOOLS,
+    TOOLS,
+    get_product_detail,
+    get_user_role,
+    perform_callback,
+    read_conversation,
+    read_ui_state,
+    request_seller_contact,
+    search_catalog,
+    send_chat_message,
+)
 
-TOOLS = [search_catalog, get_product_detail, request_seller_contact, get_user_role]
-
-SENSITIVE_TOOLS = {"request_seller_contact"}
+__all__ = [
+    "SENSITIVE_TOOLS",
+    "TOOLS",
+    "get_product_detail",
+    "get_user_role",
+    "perform_callback",
+    "read_conversation",
+    "read_ui_state",
+    "request_seller_contact",
+    "search_catalog",
+    "send_chat_message",
+]

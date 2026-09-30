@@ -2,7 +2,7 @@
 
 Source: `lib/agent/` (FastAPI + LangGraph 1.2, basic). Status: **implemented** —
 everything below exists in code, compiles, and is covered by `pytest tests/`
-(66 passed, 3 skipped opt-in e2e; fakes by default, real model only under `E2E_LIVE_AI=1`; mirror + e2e verified live on Postgres).
+(81 passed, 3 skipped opt-in e2e; fakes by default, real model only under `E2E_LIVE_AI=1`; mirror + e2e verified live on Postgres).
 
 ## Feature index
 
@@ -17,6 +17,7 @@ everything below exists in code, compiles, and is covered by `pytest tests/`
 | Personas (seller/buyer modes) | `tables/personas.md` | implemented |
 | Compaction (small-window models) | `tables/compaction.md` | implemented |
 | Models registry (provider facts) | `tables/models.md` | implemented |
+| UI bridge (read screen, callbacks) | `tables/ui_tools.md` | implemented |
 | Security (limits, caps, readiness) | `tables/security.md` | implemented |
 | Model selector (UI → db → agent) | `tables/model_selector.md` | planned |
 | SSE streaming-conversation | `tables/streaming.md` | implemented |

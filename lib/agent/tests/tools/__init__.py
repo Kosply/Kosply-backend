@@ -1,0 +1,1 @@
+"""Catalog tool tests package."""
