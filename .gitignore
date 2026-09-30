@@ -4,6 +4,9 @@ logs/
 *.log
 .DS_Store
 
+# OAuth client files (never commit credentials)
+client_secret_*.json
+
 # Go build output
 lib/server-monitoring/kosmon
 
