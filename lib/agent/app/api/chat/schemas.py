@@ -39,3 +39,12 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Ordered {callback, args} payloads from perform_callback for Flutter.",
     )
+
+
+class WaitResponse(BaseModel):
+    """Approval-wait outcome: resolved early on event, or timeout with leftovers."""
+
+    conversation_id: str
+    status: str = Field(description="resolved | timeout | noop (nothing pending).")
+    answer: str = ""
+    remainingS: int = Field(default=0, description="Seconds left of the requested budget.")

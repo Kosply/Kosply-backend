@@ -23,14 +23,45 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
 from app.agent.graph import build_graph
-from app.agent.memory.checkpointer import create_saver
+from app.agent.memory import create_saver
+from app.api.shared import _wait_for_resolution
 from app.core.config import settings
 from tests.base_test import BaseAgentTest
 
 CALL_TIMEOUT_S = 180.0
+WAIT_BUDGET_S = 1500.0
 
 
-class LiveLifecycleTest(BaseAgentTest):
+class LiveTestCase(BaseAgentTest):
+    """Live base that reuses ONE event loop for the whole class.
+
+    The provider SDK keeps its HTTP transport bound to the loop that made the
+    first call, so `IsolatedAsyncioTestCase`'s per-test loop would hand the
+    second live test a dead loop ("Event loop is closed"). Production runs a
+    single long-lived loop, so a class-scoped `asyncio.Runner` mirrors reality.
+    Live bodies are coroutines; the test methods are thin `run()` wrappers.
+    """
+
+    _runner = None
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._runner = asyncio.Runner()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._runner is not None:
+            cls._runner.close()
+            cls._runner = None
+        super().tearDownClass()
+
+    def run_async(self, coro):
+        """Run one coroutine on the class-wide loop."""
+        return self._runner.run(coro)
+
+
+class LiveLifecycleTest(LiveTestCase):
     """Full lifecycle against live server + live model + Postgres memory."""
 
     def _require_live(self):
@@ -61,7 +92,7 @@ class LiveLifecycleTest(BaseAgentTest):
         """Delete the temp user (cascades conversations, messages, resets)."""
         from psycopg import Connection
 
-        from app.core.dsn import pg_dsn
+        from app.core.config import pg_dsn
 
         with Connection.connect(pg_dsn(settings.database_url)) as conn:
             with conn.cursor() as cur:
@@ -75,8 +106,11 @@ class LiveLifecycleTest(BaseAgentTest):
             timeout=CALL_TIMEOUT_S,
         )
 
-    async def test_full_lifecycle(self):
+    def test_full_lifecycle(self):
         """message -> tool -> interrupt -> approve -> fresh instance remembers."""
+        self.run_async(self._full_lifecycle())
+
+    async def _full_lifecycle(self):
         self._require_live()
 
         thread = f"e2e-ai-{int(time.time())}"
@@ -144,3 +178,48 @@ class LiveLifecycleTest(BaseAgentTest):
             self.assertTrue(closing.strip(), "resumed session must answer on a fresh instance")
         finally:
             await close2(None, None, None)
+
+    def test_approval_wait_resolves_early(self):
+        """25-minute budget: an answer at ~2s resolves with leftovers left.
+
+        Mirrors the phone flow: request -> `409 needs_approval` -> open
+        `GET /ai/wait/{id}` (app in background) -> user taps approve ->
+        wait returns `resolved` with most of the budget untouched.
+        """
+        self.run_async(self._approval_wait_resolves_early())
+
+    async def _approval_wait_resolves_early(self):
+        self._require_live()
+
+        thread = f"e2e-wait-{int(time.time())}"
+        email = None
+        saver, close_saver = await create_saver()
+        try:
+            user = self._register_temp_user()
+            email = user["email"]
+            graph = build_graph(saver, llm=init_chat_model(settings.ai_model))
+
+            paused = await self._invoke(
+                graph,
+                {"messages": [HumanMessage(
+                    content="hubungi seller produk dev-product-1 untuk saya, pesannya: halo masih ada?")],
+                 "user_id": user["id"], "user_role": "BUYER"},
+                thread,
+            )
+            self.assertIn("__interrupt__", paused, "sensitive tool must pause for approval")
+
+            waiter = asyncio.create_task(
+                _wait_for_resolution(graph, thread, WAIT_BUDGET_S)
+            )
+            await asyncio.sleep(2.0)
+            await self._invoke(graph, Command(resume="approve"), thread)
+            out = await asyncio.wait_for(waiter, timeout=CALL_TIMEOUT_S)
+        finally:
+            await close_saver(None, None, None)
+            if email:
+                self._cleanup_user(email)
+
+        self.assertEqual(out["status"], "resolved", out)
+        self.assertTrue(out["answer"].strip(), "resolved wait must carry the answer")
+        self.assertGreater(out["remainingS"], 1400,
+                           "most of the 25-minute budget must survive an early answer")

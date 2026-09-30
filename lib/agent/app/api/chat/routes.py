@@ -14,11 +14,12 @@ from app.api.shared import (
     _final_answer,
     _raise_if_interrupted,
     _thread,
+    _wait_for_resolution,
 )
 from app.core.config import settings
-from app.core.errors import AgentError, ApprovalRequired, ModelError
+from app.core.errors import AgentError, ApprovalRequired, ModelError, ServerBusy
 from app.core.limits import run_guarded, stream_guarded
-from .schemas import ChatRequest, ChatResponse, ResumeRequest
+from .schemas import ChatRequest, ChatResponse, ResumeRequest, WaitResponse
 from .streaming import stream_chat_events
 
 router = APIRouter()
@@ -119,3 +120,25 @@ async def resume(req: ResumeRequest, request: Request) -> ChatResponse:
         answer=answer,
         callbacks=_extract_callbacks(result),
     )
+
+
+@router.get("/ai/wait/{conversation_id}", response_model=WaitResponse)
+async def wait_approval(conversation_id: str, request: Request, timeout: float = 60.0) -> WaitResponse:
+    """Wait for a pending user approval: resolves on event, else on timeout.
+
+    Event-based (no fixed waiting): returns the moment the interrupt clears
+    with `remainingS` leftovers; `timeout` seconds cap (1..1500). `noop` when
+    nothing is pending. Needs background permission on the phone for long waits.
+    """
+    graph = request.app.state.graph
+    waiters = getattr(request.app.state, "waiters", None)
+    if waiters is not None and waiters.locked():
+        raise ServerBusy()
+    if waiters is not None:
+        await waiters.acquire()
+    try:
+        out = await _wait_for_resolution(graph, conversation_id, timeout)
+    finally:
+        if waiters is not None:
+            waiters.release()
+    return WaitResponse(conversation_id=conversation_id, **out)

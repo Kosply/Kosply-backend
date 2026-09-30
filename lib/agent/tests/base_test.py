@@ -101,7 +101,9 @@ class BaseAgentTest(unittest.IsolatedAsyncioTestCase):
 
         app.state.graph = graph
         app.state.inflight = asyncio.Semaphore(50)
+        app.state.waiters = asyncio.Semaphore(200)
         app.state.saver = InMemorySaver()
+        return graph
 
     def mount_fake(self, responses=None):
         """Point the shared app at a fake graph + fresh semaphore. Returns the graph."""

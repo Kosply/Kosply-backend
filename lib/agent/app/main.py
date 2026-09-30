@@ -42,6 +42,9 @@ async def lifespan(app: FastAPI):
         )
         app.state.saver = saver
         app.state.inflight = asyncio.Semaphore(settings.max_inflight)
+        # Long approval waits are cheap (no model call) but must stay bounded
+        # so a burst of phones cannot pin an unbounded number of coroutines.
+        app.state.waiters = asyncio.Semaphore(settings.max_waiters)
         yield
     finally:
         await close_saver(None, None, None)

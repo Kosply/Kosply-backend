@@ -49,6 +49,7 @@ class Settings:
     rate_limit_per_min: int
     max_body_bytes: int
     max_inflight: int
+    max_waiters: int
     model_timeout_s: float
     queue_timeout_s: float
     compaction_max_messages: int
@@ -85,6 +86,7 @@ def load_settings() -> Settings:
         rate_limit_per_min=_parse_int(os.getenv("AI_RATE_LIMIT_PER_MIN"), 60),
         max_body_bytes=_parse_int(os.getenv("AI_MAX_BODY_BYTES"), 1_000_000),
         max_inflight=_parse_int(os.getenv("AI_MAX_INFLIGHT"), 50),
+        max_waiters=_parse_int(os.getenv("AI_MAX_WAITERS"), 200),
         model_timeout_s=_parse_float(os.getenv("AI_MODEL_TIMEOUT_S"), 120.0),
         queue_timeout_s=_parse_float(os.getenv("AI_QUEUE_TIMEOUT_S"), 5.0),
         compaction_max_messages=_parse_int(os.getenv("AI_COMPACTION_MAX_MESSAGES"), 30),
