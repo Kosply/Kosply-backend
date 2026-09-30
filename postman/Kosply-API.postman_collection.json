@@ -64,6 +64,14 @@
 		{
 			"key": "resetCode",
 			"value": ""
+		},
+		{
+			"key": "notificationId",
+			"value": ""
+		},
+		{
+			"key": "adminUserId",
+			"value": ""
 		}
 	],
 	"item": [
@@ -513,6 +521,160 @@
 								}
 							],
 							"body": "{\"status\": \"ok\"}"
+						}
+					]
+				},
+				{
+					"name": "POST Google login",
+					"request": {
+						"description": "Direct Google sign-in (idToken from google_sign_in). Returns onboardingRequired + isNew.",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/google",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"google"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"PASTE_FROM_FLUTTER\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/auth/google",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"google"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"idToken\": \"PASTE_FROM_FLUTTER\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"user\": {\"id\": \"u9\", \"email\": \"s@kosply.test\", \"username\": \"s9\", \"name\": \"Social\", \"role\": \"BUYER\", \"universitas\": \"\", \"programStudi\": \"\", \"onboardingRequired\": true}, \"token\": \"jwt\", \"onboardingRequired\": true, \"isNew\": true}"
+						}
+					]
+				},
+				{
+					"name": "POST Apple login",
+					"request": {
+						"description": "Direct Apple sign-in (identityToken; names on first login only).",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/apple",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"apple"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"identityToken\": \"PASTE_FROM_FLUTTER\",\n  \"givenName\": \"Social\",\n  \"familyName\": \"Test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/auth/apple",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"apple"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"identityToken\": \"PASTE_FROM_FLUTTER\",\n  \"givenName\": \"Social\",\n  \"familyName\": \"Test\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"user\": {\"id\": \"u9\", \"email\": \"s@kosply.test\", \"username\": \"s9\", \"name\": \"Social\", \"role\": \"BUYER\", \"universitas\": \"\", \"programStudi\": \"\", \"onboardingRequired\": true}, \"token\": \"jwt\", \"onboardingRequired\": true, \"isNew\": true}"
 						}
 					]
 				}
@@ -1434,6 +1596,140 @@
 							"body": "{\"status\": \"ok\", \"items\": [{\"id\": \"cmm1\", \"type\": \"TEXT\", \"text\": \"halo\"}]}"
 						}
 					]
+				},
+				{
+					"name": "GET Wait for reply",
+					"request": {
+						"description": "Long-poll: returns on new message or timeout (after=cursor, timeout=sec).",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/conversations/{{conversationId}}/wait?after=&timeout=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"conversations",
+								"{{conversationId}}",
+								"wait"
+							],
+							"query": [
+								{
+									"key": "after",
+									"value": ""
+								},
+								{
+									"key": "timeout",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/conversations/{{conversationId}}/wait?after=&timeout=5",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"conversations",
+										"{{conversationId}}",
+										"wait"
+									],
+									"query": [
+										{
+											"key": "after",
+											"value": ""
+										},
+										{
+											"key": "timeout",
+											"value": "5"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"outcome\": \"new\", \"messages\": [{\"id\": \"m2\", \"text\": \"masih!\"}]}"
+						}
+					]
+				},
+				{
+					"name": "GET Stream messages",
+					"request": {
+						"description": "SSE: history, live rows, pings, done (timeout=sec for tests).",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/conversations/{{conversationId}}/stream?timeout=2",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"conversations",
+								"{{conversationId}}",
+								"stream"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "2"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/conversations/{{conversationId}}/stream?timeout=2",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"conversations",
+										"{{conversationId}}",
+										"stream"
+									],
+									"query": [
+										{
+											"key": "timeout",
+											"value": "2"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "\"event: message\\ndata: {\\\"id\\\": \\\"m1\\\"}\\n\\nevent: done\\ndata: {\\\"ok\\\": true}\\n\\n\""
+						}
+					]
 				}
 			]
 		},
@@ -2102,6 +2398,241 @@
 							"body": "{\"status\": \"ok\", \"admin\": {\"id\": \"cma1\", \"email\": \"admin@kosply.test\", \"name\": \"Dev Admin\"}, \"token\": \"pm.mock.token\"}"
 						}
 					]
+				},
+				{
+					"name": "POST Create admin",
+					"request": {
+						"description": "SUPER_ADMIN only. Password set once here.",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/admin/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"users"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"op@kosply.test\",\n  \"username\": \"op1\",\n  \"name\": \"Ops\",\n  \"password\": \"adminpass1\",\n  \"role\": \"ADMIN\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/admin/users",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"users"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"op@kosply.test\",\n  \"username\": \"op1\",\n  \"name\": \"Ops\",\n  \"password\": \"adminpass1\",\n  \"role\": \"ADMIN\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u9\", \"role\": \"ADMIN\"}}"
+						}
+					]
+				},
+				{
+					"name": "PATCH Admin self",
+					"request": {
+						"description": "Own photo/name/username (password locked).",
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/admin/users/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"users",
+								"me"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"photo\": \"https://cdn.test/b.png\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/admin/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"users",
+										"me"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"photo\": \"https://cdn.test/b.png\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u9\", \"photo\": \"https://cdn.test/b.png\"}}"
+						}
+					]
+				},
+				{
+					"name": "PATCH Update admin",
+					"request": {
+						"description": "SUPER_ADMIN only: profile + isActive.",
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/admin/users/{{adminUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"users",
+								"{{adminUserId}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isActive\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/admin/users/{{adminUserId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"users",
+										"{{adminUserId}}"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"isActive\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u9\", \"isActive\": false}}"
+						}
+					]
 				}
 			]
 		},
@@ -2536,6 +3067,140 @@
 							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"cmu0000000000000000000001\", \"username\": \"t123\", \"name\": \"Postman User\", \"role\": \"BUYER\", \"universitas\": \"Univ Test\"}}"
 						}
 					]
+				},
+				{
+					"name": "GET Internal COD history",
+					"request": {
+						"description": "Agent machine API: COD messages oldest-first.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"internal",
+								"conversations",
+								"{{conversationId}}",
+								"messages"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"internal",
+										"conversations",
+										"{{conversationId}}",
+										"messages"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"items\": [{\"id\": \"m1\", \"type\": \"TEXT\", \"text\": \"nego 100rb?\"}]}"
+						}
+					]
+				},
+				{
+					"name": "POST Internal COD send",
+					"request": {
+						"description": "Agent machine API: send as member (senderId in body).",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"internal",
+								"conversations",
+								"{{conversationId}}",
+								"messages"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"senderId\": \"{{userId}}\",\n  \"message\": { \"text\": \"deal 100rb\" }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"internal",
+										"conversations",
+										"{{conversationId}}",
+										"messages"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"senderId\": \"{{userId}}\",\n  \"message\": { \"text\": \"deal 100rb\" }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"m2\", \"type\": \"TEXT\"}}"
+						}
+					]
 				}
 			]
 		},
@@ -2555,7 +3220,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"message\": \"halo\"\n}",
+							"raw": "{\n  \"message\": \"halo\",\n  \"ui_state\": {\n    \"screen\": \"catalog\",\n    \"visible_ids\": [\n      \"dev-product-1\"\n    ],\n    \"filters\": {\n      \"q\": \"kipas\"\n    }\n  }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2632,7 +3297,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"message\": \"halo\"\n}",
+							"raw": "{\n  \"message\": \"halo\",\n  \"ui_state\": {\n    \"screen\": \"catalog\",\n    \"visible_ids\": [\n      \"dev-product-1\"\n    ],\n    \"filters\": {\n      \"q\": \"kipas\"\n    }\n  }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2827,6 +3492,198 @@
 					]
 				},
 				{
+					"name": "GET Wait for approval",
+					"request": {
+						"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"ai",
+								"wait",
+								"{{conversationId}}"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "60"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 resolved",
+							"originalRequest": {
+								"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"ai",
+										"wait",
+										"{{conversationId}}"
+									],
+									"query": [
+										{
+											"key": "timeout",
+											"value": "60"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"conversation_id\": \"cmai1\", \"status\": \"resolved\", \"answer\": \"Sudah aku kirim ya!\", \"remainingS\": 1380}"
+						}
+					]
+				},
+				{
+					"name": "GET Wait timeout",
+					"request": {
+						"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"ai",
+								"wait",
+								"{{conversationId}}"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "60"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 resolved",
+							"originalRequest": {
+								"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"ai",
+										"wait",
+										"{{conversationId}}"
+									],
+									"query": [
+										{
+											"key": "timeout",
+											"value": "60"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"conversation_id\": \"cmai1\", \"status\": \"timeout\", \"answer\": \"\", \"remainingS\": 0}"
+						}
+					]
+				},
+				{
+					"name": "GET Wait noop",
+					"request": {
+						"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"ai",
+								"wait",
+								"{{conversationId}}"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "60"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 resolved",
+							"originalRequest": {
+								"description": "Long-poll a pending approval: resolved as soon as the user answers, with remainingS leftovers (25 min budget answered at 2 min -> remainingS ~1380). Needs the phone alive in background for long waits.",
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=60",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"ai",
+										"wait",
+										"{{conversationId}}"
+									],
+									"query": [
+										{
+											"key": "timeout",
+											"value": "60"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"conversation_id\": \"cmai1\", \"status\": \"noop\", \"answer\": \"\", \"remainingS\": 60}"
+						}
+					]
+				},
+				{
 					"name": "GET History",
 					"request": {
 						"description": "Session messages via the agent (needs it up).",
@@ -2874,6 +3731,567 @@
 								}
 							],
 							"body": "{\"conversation_id\": \"cmai1\", \"messages\": [{\"role\": \"human\", \"content\": \"halo\"}, {\"role\": \"ai\", \"content\": \"Halo!\"}]}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Profile",
+			"item": [
+				{
+					"name": "GET My profile",
+					"request": {
+						"description": "Own profile (JWT).",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"me"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"users",
+										"me"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u1\", \"username\": \"t1\", \"name\": \"N\", \"role\": \"BUYER\", \"bio\": \"lapak\"}}"
+						}
+					]
+				},
+				{
+					"name": "PATCH My profile",
+					"request": {
+						"description": "Update name/username/bio/photo (email+password locked).",
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"me"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bio\": \"Lapak halos\",\n  \"photo\": \"https://cdn.test/a.png\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"users",
+										"me"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"bio\": \"Lapak halos\",\n  \"photo\": \"https://cdn.test/a.png\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u1\", \"bio\": \"Lapak halos\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Public profile",
+					"request": {
+						"description": "Any profile by id (no email/hash).",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/users/{{userId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"users",
+										"{{userId}}"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"u1\", \"username\": \"t1\"}}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "GET List",
+					"request": {
+						"description": "Own notifications, newest first.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"items\": [{\"id\": \"n1\", \"type\": \"chat\", \"title\": \"Pesan baru\", \"isRead\": false}]}"
+						}
+					]
+				},
+				{
+					"name": "GET Unread only",
+					"request": {
+						"description": "Filter unreadOnly=true.",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?unreadOnly=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications?unreadOnly=true"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications?unreadOnly=true",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications?unreadOnly=true"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"items\": []}"
+						}
+					]
+				},
+				{
+					"name": "POST Mark read",
+					"request": {
+						"description": "Mark one notification read.",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"{{notificationId}}",
+								"read"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications",
+										"{{notificationId}}",
+										"read"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"id\": \"n1\", \"isRead\": true}}"
+						}
+					]
+				},
+				{
+					"name": "POST Read all",
+					"request": {
+						"description": "Mark everything read.",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/read-all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"read-all"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications/read-all",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications",
+										"read-all"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"count\": 3}"
+						}
+					]
+				},
+				{
+					"name": "GET Preferences",
+					"request": {
+						"description": "All toggles with values (default on).",
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/preferences",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"preferences"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications/preferences",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications",
+										"preferences"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"items\": [{\"key\": \"chat\", \"enabled\": true}]}"
+						}
+					]
+				},
+				{
+					"name": "PATCH Preference",
+					"request": {
+						"description": "Freely enable/disable one key.",
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/preferences",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"preferences"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"chat\",\n  \"enabled\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/api/notifications/preferences",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"notifications",
+										"preferences"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"key\": \"chat\",\n  \"enabled\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": \"ok\", \"item\": {\"key\": \"chat\", \"enabled\": false}}"
 						}
 					]
 				}

@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/users/me'
+description: 'Own profile (JWT).'
+order: 200
+headers: []

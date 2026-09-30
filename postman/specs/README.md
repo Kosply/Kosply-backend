@@ -15,6 +15,8 @@ covered by `npm test` (live parts skip without `DATABASE_URL`).
 | Conversations (COD) | `tables/conversations.md` | JWT, member-scoped |
 | Support | `tables/support.md` | JWT (filters ADMIN) |
 | Reports | `tables/reports.md` | JWT (list/review ADMIN) |
+| Users | `tables/users.md` | JWT self, public read |
+| Notifications | `tables/notifications.md` | JWT owner-scoped |
 | Admin | `tables/admin.md` | none (separate credentials) |
 | Models | `tables/models.md` | reads public, writes ADMIN |
 | Internal (agent) | `tables/internal.md` | none (localhost trust) |

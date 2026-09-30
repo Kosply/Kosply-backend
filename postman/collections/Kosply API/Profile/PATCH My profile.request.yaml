@@ -1,0 +1,15 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/users/me'
+description: 'Update name/username/bio/photo (email+password locked).'
+order: 210
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "bio": "Lapak halos",
+      "photo": "https://cdn.test/a.png"
+    }

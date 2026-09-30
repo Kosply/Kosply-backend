@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages'
+description: 'Agent machine API: COD messages oldest-first.'
+order: 10300
+headers: []

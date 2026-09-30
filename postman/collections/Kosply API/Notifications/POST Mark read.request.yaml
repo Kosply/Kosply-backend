@@ -1,0 +1,12 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/notifications/{{notificationId}}/read'
+description: 'Mark one notification read.'
+order: 12200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {}

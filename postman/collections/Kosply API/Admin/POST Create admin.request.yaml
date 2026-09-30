@@ -1,0 +1,18 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/admin/users'
+description: 'SUPER_ADMIN only. Password set once here.'
+order: 8100
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "op@kosply.test",
+      "username": "op1",
+      "name": "Ops",
+      "password": "adminpass1",
+      "role": "ADMIN"
+    }

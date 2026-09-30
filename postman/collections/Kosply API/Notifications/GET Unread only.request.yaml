@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/notifications?unreadOnly=true'
+description: 'Filter unreadOnly=true.'
+order: 12100
+headers: []

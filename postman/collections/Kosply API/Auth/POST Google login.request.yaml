@@ -1,0 +1,14 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/auth/google'
+description: 'Direct Google sign-in (idToken from google_sign_in). Returns onboardingRequired + isNew.'
+order: 2400
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "idToken": "PASTE_FROM_FLUTTER"
+    }

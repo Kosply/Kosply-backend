@@ -1,0 +1,16 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/auth/apple'
+description: 'Direct Apple sign-in (identityToken; names on first login only).'
+order: 2500
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "identityToken": "PASTE_FROM_FLUTTER",
+      "givenName": "Social",
+      "familyName": "Test"
+    }

@@ -1,0 +1,15 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/internal/conversations/{{conversationId}}/messages'
+description: 'Agent machine API: send as member (senderId in body).'
+order: 10400
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "senderId": "{{userId}}",
+      "message": { "text": "deal 100rb" }
+    }

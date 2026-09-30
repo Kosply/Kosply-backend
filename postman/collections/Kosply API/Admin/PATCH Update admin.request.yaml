@@ -1,0 +1,14 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/admin/users/{{adminUserId}}'
+description: 'SUPER_ADMIN only: profile + isActive.'
+order: 8300
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "isActive": false
+    }

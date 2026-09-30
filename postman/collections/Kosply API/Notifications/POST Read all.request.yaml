@@ -1,0 +1,12 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/notifications/read-all'
+description: 'Mark everything read.'
+order: 12300
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {}

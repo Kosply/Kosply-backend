@@ -1,0 +1,14 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/admin/users/me'
+description: 'Own photo/name/username (password locked).'
+order: 8200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "photo": "https://cdn.test/b.png"
+    }

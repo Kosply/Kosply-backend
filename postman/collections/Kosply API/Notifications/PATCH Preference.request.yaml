@@ -1,0 +1,15 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/notifications/preferences'
+description: 'Freely enable/disable one key.'
+order: 12500
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "key": "chat",
+      "enabled": false
+    }

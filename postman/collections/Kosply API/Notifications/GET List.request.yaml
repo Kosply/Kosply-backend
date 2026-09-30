@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/notifications'
+description: 'Own notifications, newest first.'
+order: 12000
+headers: []

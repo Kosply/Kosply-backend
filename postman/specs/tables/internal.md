@@ -9,3 +9,5 @@ localhost). Never returns emails, hashes, or KTM data.
 | GET | `/api/internal/products/:id` | `200 {item}` + public seller | `404 PRODUCT_NOT_FOUND`, `503 DB_UNAVAILABLE` |
 | GET | `/api/internal/users/:id` | `200 {item}` (`id, username, name, role, universitas`) | `404 USER_NOT_FOUND`, `503 DB_UNAVAILABLE` |
 | POST | `/api/internal/contact-requests` | `202 {status: queued}` intake stub | `400 VALIDATION`, `404 PRODUCT_NOT_FOUND` / `USER_NOT_FOUND` |
+| GET | `/api/internal/conversations/:id/messages` | `200 {items}` oldest-first (AI negotiator context) | `503 DB_UNAVAILABLE` |
+| POST | `/api/internal/conversations/:id/messages` | `201 {item}` as member (`senderId` in body, other side notified) | `400 VALIDATION`, `404 CONVERSATION_NOT_FOUND` |
