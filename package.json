@@ -4,7 +4,7 @@
   "description": "Kosply Backend - Express + PM2 scaffold",
   "main": "lib/server/server.js",
   "scripts": {
-    "test": "node --test --test-timeout=120000 \"lib/server/tests/**/*.test.js\" \"lib/db/tests/**/*.test.js\"",
+    "test": "RATE_LIMIT=off node --test --test-timeout=120000 \"lib/server/tests/**/*.test.js\" \"lib/db/tests/**/*.test.js\"",
     "dev": "node --watch lib/server/server.js",
     "dev:staging": "NODE_ENV=staging PORT=3001 node --watch lib/server/server.js",
     "start": "node lib/server/server.js",
