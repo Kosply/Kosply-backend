@@ -107,6 +107,14 @@ jobs:
           while IFS= read -r f; do node --check "$f"; done < <(git ls-files '*.js' ':!:node_modules' ':!lib/agent/**')
           echo "checked $(git ls-files '*.js' ':!:node_modules' ':!lib/agent/**' | wc -l) files"
 
+      # The Postman catalog is maintained by hand in two formats. Nothing
+      # checked either against the routes, so it silently fell behind: the
+      # analytics POC was missing entirely, the seller review URL had a literal
+      # `:id` that could never resolve, and every internal request omitted
+      # `x-internal-key` and was therefore a guaranteed 401.
+      - name: Postman catalog matches the server
+        run: ./scripts/postman/validate.sh
+
       - name: Unit + integration tests (node:test, with a real database)
         run: npm test
         env:

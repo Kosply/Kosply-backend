@@ -9,6 +9,8 @@ scripts/
   server.sh         the server: `dev` for foreground, staging/main via PM2
   db/db.sh          Prisma + Postgres workflows
   agent/agent.sh    venv, run and test the Python agent
+  postman/
+    validate.sh     assert the API catalog still matches the routes
 ```
 
 ## First run
@@ -97,6 +99,24 @@ server rather than a missing variable.
 `staging` and `main` apply pending migrations first, and `main` resolves its own
 `DATABASE_URL` rather than inheriting whatever is in the environment. They need
 PM2; `dev` needs neither PM2 nor the Go toolchain.
+
+### `scripts/postman/validate.sh`
+
+```bash
+./scripts/postman/validate.sh
+```
+
+Fails when the Postman catalog drifts from `lib/server/routes/`:
+
+- a route exists in the server but not in the collection JSON or the yaml mirror
+- a catalog entry points at a route that does not exist
+- a `{{variable}}` placeholder was left as a literal `:param` (such a request can
+  never resolve)
+- an `/api/internal/*` request is missing `x-internal-key`, and would therefore
+  return 401
+
+Runs in CI, so adding a route without adding its catalog entry fails the build.
+See `postman/README.md`.
 
 ## Adding a command
 

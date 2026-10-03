@@ -30,6 +30,7 @@ Kosply-backend/
     server.sh               # server: `dev` foreground, staging/main via PM2
     db/db.sh                # Prisma + Postgres workflows
     agent/agent.sh          # venv, run and test the Python agent
+    postman/validate.sh     # catalog-vs-routes drift check (runs in CI)
     _common.sh              # shared helpers (env loading, readiness probes)
   lib/
     server/                 # Express API — the whole public surface
@@ -92,6 +93,7 @@ Postgres → migrations → server → agent.
 npm test                      # server + db (needs DATABASE_URL)
 ./scripts/agent/agent.sh test # agent (pytest)
 ./scripts/db/db.sh drift      # migrations must reproduce schema.prisma
+./scripts/postman/validate.sh # the Postman catalog still matches the routes
 ```
 
 `npm test` sets `RATE_LIMIT=off`: the suite drives many auth attempts in one
@@ -99,7 +101,10 @@ process and would otherwise trip its own throttling.
 `tests/shared/rate_limit.test.js` re-enables it and asserts the real behaviour.
 
 CI additionally runs the agent suite, `prisma migrate deploy` against a real
-Postgres, and the drift gate.
+Postgres, the drift gate, and a check that the Postman catalog still matches the
+routes. That last one exists because the catalog is maintained by hand in two
+formats, and it had silently fallen behind — a new route with no catalog entry
+now fails the build.
 
 ## Env
 
@@ -233,3 +238,4 @@ Honest list of what is *not* finished:
 | `lib/agent/agent_spec/tables/` | per-subsystem design notes |
 | `lib/db/README.md` | schema and migration workflow |
 | `scripts/README.md` | every script, and the ordering rules |
+| `postman/README.md` | the API catalog, run order, and the validator |
