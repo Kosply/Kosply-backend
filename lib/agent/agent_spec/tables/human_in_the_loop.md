@@ -13,6 +13,23 @@ pause; everything else flows straight to `tools`.
 | 4b. Reject | client → `POST /ai/chat/resume {approve: false}` | `Command(resume="reject")` → `ToolMessage("User rejected…")` → agent answers without running the tool |
 | 5. Wait instead of blocking UI | client → `GET /ai/wait/{conversation_id}?timeout=N` | Long-polls the checkpoint every 1s; returns the moment the interrupt clears, with `remainingS` |
 
+## What approval does and does not cover
+
+Approving is consent for **the action**, never for **an identity**. The acting
+user for `send_chat_message` and `request_seller_contact` is read from graph
+state (`user_id`, injected via `InjectedState`), never from the model's tool
+arguments. If it came from the arguments, approval would turn "send this
+message" into "send this message AS anyone".
+
+| Property | Pinned by |
+|---|---|
+| Sensitive tools pause; read-only ones do not | `tests/graph/test_graph.py`, `test_approval_identity.py` |
+| Approved action acts as the session user | `test_approval_identity.py::test_approved_send_acts_as_the_session_user` |
+| A model-supplied `senderId` is ignored | `test_model_cannot_choose_the_acting_user` |
+| No session user ⇒ nothing is sent, even when approved | `test_approved_send_without_a_session_sends_nothing` |
+| Rejected ⇒ the network is never touched | `test_rejected_action_never_touches_the_network` |
+| `perform_callback` is not gated | it is allow-listed to `SAFE_CALLBACKS` (navigation only); anything that writes goes through a sensitive tool |
+
 ## Approval wait
 
 `GET /ai/wait/{conversation_id}?timeout=N` (`_wait_for_resolution` in
