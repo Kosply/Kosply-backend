@@ -122,7 +122,14 @@ cmd_clean() {
 }
 
 main() {
-  load_env "$(agent_env)"
+  load_env ""$(agent_env)""
+  # `-h` / `--help` anywhere means help, even after a valid command:
+  # `./scripts/dev.sh logs --help` must not fall through into `tail -F`.
+  for arg in "$@"; do
+    case "$arg" in
+      -h|--help|help) usage; exit 0 ;;
+    esac
+  done
   local command="${1:-}"
   shift || true
   case "$command" in
