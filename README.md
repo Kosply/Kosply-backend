@@ -232,8 +232,7 @@ Honest list of what is *not* finished:
 
 | Where | What |
 |---|---|
-| `lib/server/WIRING.md` | endpoint → backing data map, both directions |
-| `lib/server/README.md` | server detail |
+| `lib/server/README.md` | server detail, and which table backs what |
 | `lib/agent/README.md` | agent detail |
 | `lib/agent/agent_spec/tables/` | per-subsystem design notes |
 | `lib/db/README.md` | schema and migration workflow |

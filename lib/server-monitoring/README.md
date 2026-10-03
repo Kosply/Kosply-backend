@@ -85,6 +85,18 @@ Piped/non-TTY input falls back to numbered selection automatically.
 - `switch <env>` ensures the target is running, then stops the other one.
 - Set `NO_COLOR=1` to disable colored output.
 
+### Restart actually applies your changes
+
+`restart` goes through `startOrRestart ecosystem.config.js --update-env`, not
+`pm2 restart <name>`. The latter replays PM2's *stored* config, so an edited pool
+size, worker count or environment variable was silently discarded and there was
+no way to apply it from the CLI. `restart` also refuses when the target is not
+registered, instead of failing obscurely inside PM2.
+
+Migrations are **not** run by `kosmon`. `scripts/server.sh` applies them before
+invoking it, because `migrate deploy` — not `migrate dev` — is the safe path for
+a shared environment, and the target database differs between staging and main.
+
 ## Structure
 
 ```
@@ -97,4 +109,7 @@ lib/server-monitoring/
 ```
 
 When new routes are added to `lib/server`, mirror them in
-`internal/api/api.go` `Registry()` so `list` and menu testing stay complete.
+`internal/api/api.go` `Registry()` so `list` and menu testing stay complete. The
+same routes must also land in the Postman catalog; `scripts/postman/validate.sh`
+compares the catalog against the routes and runs in CI, so the two registries
+cannot drift apart unnoticed.
