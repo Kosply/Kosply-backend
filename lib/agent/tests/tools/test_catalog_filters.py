@@ -29,7 +29,7 @@ class FakeResp:
 def _run(query="x", **kwargs):
     """Invoke the real tool with mocked HTTP."""
     with mock.patch(
-        "app.agent.tools.catalog.catalog.httpx.get",
+        "app.agent.tools.catalog.catalog.server_get",
         return_value=FakeResp({"status": "ok", "items": ITEMS}),
     ):
         return search_catalog.invoke({"query": query, **kwargs})
@@ -61,7 +61,7 @@ class CatalogFilterTest(BaseAgentTest):
         from app.core.errors import ToolError
 
         with mock.patch(
-            "app.agent.tools.catalog.catalog.httpx.get",
+            "app.agent.tools.catalog.catalog.server_get",
             side_effect=ConnectionError("down"),
         ):
             with self.assertRaises(ToolError):

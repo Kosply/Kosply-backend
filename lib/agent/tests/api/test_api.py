@@ -2,6 +2,7 @@
 
 from httpx import ASGITransport, AsyncClient
 
+from tests.client import agent_headers
 from app.main import app
 
 from tests.base_test import BaseAgentTest, canned_answer, canned_tool_call
@@ -17,7 +18,8 @@ class ApiTest(BaseAgentTest):
     async def test_health(self):
         """Liveness probe returns the service name."""
         async with AsyncClient(
-            transport=self._transport(), base_url="http://test"
+            transport=self._transport(), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.get("/health")
         self.assertEqual(res.status_code, 200)
@@ -35,7 +37,8 @@ class ApiTest(BaseAgentTest):
             ]
         )
         async with AsyncClient(
-            transport=self._transport(), base_url="http://test"
+            transport=self._transport(), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.post(
                 "/ai/chat",
@@ -56,7 +59,8 @@ class ApiTest(BaseAgentTest):
         self.reset_sse()
         self.mount_fake([canned_answer("halo juga")])
         async with AsyncClient(
-            transport=self._transport(), base_url="http://test"
+            transport=self._transport(), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             async with client.stream(
                 "POST",
@@ -71,7 +75,8 @@ class ApiTest(BaseAgentTest):
         """History lists both sides of the finished turn."""
         self.mount_fake([canned_answer("hai")])
         async with AsyncClient(
-            transport=self._transport(), base_url="http://test"
+            transport=self._transport(), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             await client.post(
                 "/ai/chat",
@@ -87,7 +92,8 @@ class ApiTest(BaseAgentTest):
         """Readiness reports degraded (not down) on the memory checkpointer."""
         self.mount_fake([canned_answer("hai")])
         async with AsyncClient(
-            transport=self._transport(), base_url="http://test"
+            transport=self._transport(), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.get("/readyz")
         self.assertEqual(res.status_code, 200)

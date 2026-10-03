@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage
 
+from tests.client import agent_headers
 from app.api.shared import _wait_for_resolution
 from app.main import app
 from tests.base_test import BaseAgentTest, canned_answer, canned_tool_call
@@ -69,7 +70,8 @@ class WaitRouteTest(BaseAgentTest):
         """GET /ai/wait/:id on a fresh thread answers noop."""
         self.mount_fake([canned_answer("ok")])
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.get("/ai/wait/fresh-route")
         self.assertEqual(res.status_code, 200)
@@ -80,7 +82,8 @@ class WaitRouteTest(BaseAgentTest):
         self.mount_fake([canned_answer("ok")])
         app.state.waiters = asyncio.Semaphore(0)
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.get("/ai/wait/busy-route")
         self.assertEqual(res.status_code, 503)

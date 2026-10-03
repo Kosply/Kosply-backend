@@ -3,6 +3,7 @@
 from httpx import ASGITransport, AsyncClient
 from langgraph.checkpoint.memory import InMemorySaver
 
+from tests.client import agent_headers
 from app.agent.graph import build_graph
 from app.agent.policy import (
     SYSTEM_PROMPT,
@@ -85,7 +86,8 @@ class PersonaRouteTest(BaseAgentTest):
         """POST /ai/chat accepts role and answers normally."""
         self.mount_fake([canned_answer("siap bantu jualan")])
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.post(
                 "/ai/chat",

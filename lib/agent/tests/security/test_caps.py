@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from app.core.errors import ModelTimeout, ServerBusy
-from app.core.limits import body_cap_middleware, run_guarded, stream_guarded
+from app.core.limits import BodyCapMiddleware, run_guarded, stream_guarded
 from tests.base_test import BaseAgentTest
 
 
@@ -15,7 +15,7 @@ class BodyCapTest(BaseAgentTest):
 
     def _mini_app(self):
         mini = FastAPI()
-        mini.middleware("http")(body_cap_middleware(10))
+        mini.add_middleware(BodyCapMiddleware, max_bytes=10)
 
         @mini.post("/ai/x")
         async def guarded():

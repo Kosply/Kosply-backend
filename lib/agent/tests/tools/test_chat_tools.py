@@ -35,24 +35,37 @@ class NegoToolTest(BaseAgentTest):
     def test_read_returns_history(self):
         """History payload reaches the model untouched."""
         with mock.patch(
-            "app.agent.tools.chat.chat.httpx.get",
+            "app.agent.tools.chat.chat.server_get",
             return_value=FakeResp({"status": "ok", "items": [{"text": "nego 100rb?"}]}),
         ):
-            out = read_conversation.invoke({"conversation_id": "c1"})
+            # `user_id` from graph state is required: the server's membership
+            # gate needs `userId`, so without it the call was a 400.
+            out = read_conversation.invoke(
+                {"conversation_id": "c1", "state": {"user_id": "u-1"}}
+            )
         self.assertIn("nego 100rb?", out)
+
+    def test_read_refuses_without_a_session_user(self):
+        """No session user must never reach the network."""
+        with mock.patch("app.agent.tools.chat.chat.server_get") as call:
+            out = read_conversation.invoke({"conversation_id": "c1", "state": {}})
+        self.assertIn("No user in session", out)
+        call.assert_not_called()
 
     def test_read_failure_is_tool_error(self):
         """Transport failures surface as ToolError."""
         with mock.patch(
-            "app.agent.tools.chat.chat.httpx.get", side_effect=ConnectionError("down")
+            "app.agent.tools.chat.chat.server_get", side_effect=ConnectionError("down")
         ):
             with self.assertRaises(ToolError):
-                read_conversation.invoke({"conversation_id": "c1"})
+                read_conversation.invoke(
+                    {"conversation_id": "c1", "state": {"user_id": "u-1"}}
+                )
 
     def test_send_guards_empty_and_userless(self):
         """Empty text and missing users never hit the network."""
         with mock.patch(
-            "app.agent.tools.chat.chat.httpx.post",
+            "app.agent.tools.chat.chat.server_post",
             side_effect=AssertionError("must not call"),
         ):
             out = send_chat_message.invoke(
@@ -70,7 +83,7 @@ class NegoToolTest(BaseAgentTest):
             seen.update(kwargs.get("json", {}))
             return FakeResp({"status": "ok", "item": {"id": "m1"}})
 
-        with mock.patch("app.agent.tools.chat.chat.httpx.post", side_effect=fake_post):
+        with mock.patch("app.agent.tools.chat.chat.server_post", side_effect=fake_post):
             out = send_chat_message.invoke(
                 {"conversation_id": "c1", "text": "deal 100rb",
                  "state": {"user_id": "u9"}}

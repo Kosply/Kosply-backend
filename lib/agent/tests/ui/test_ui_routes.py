@@ -2,6 +2,7 @@
 
 from httpx import ASGITransport, AsyncClient
 
+from tests.client import agent_headers
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel, canned_answer, canned_tool_call
 
@@ -17,7 +18,8 @@ class UiRouteTest(BaseAgentTest):
             canned_answer("dibuka ya"),
         ])
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.post(
                 "/ai/chat",
@@ -40,7 +42,8 @@ class UiRouteTest(BaseAgentTest):
             canned_answer("difilter ya"),
         ])
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             async with client.stream(
                 "POST",

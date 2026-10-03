@@ -2,6 +2,7 @@
 
 from httpx import ASGITransport, AsyncClient
 
+from tests.client import agent_headers
 from app.agent.policy import (
     REJECTION_MESSAGE,
     SYSTEM_PROMPT,
@@ -104,7 +105,8 @@ class RoutePolicyTest(BaseAgentTest):
         fake = StatefulFakeChatModel(responses=list(unused))
         self.mount_graph(build_graph(InMemorySaver(), llm=fake))
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             res = await client.post(
                 "/ai/chat",
@@ -120,7 +122,8 @@ class RoutePolicyTest(BaseAgentTest):
         self.reset_sse()
         self.mount_fake([canned_answer("unused")])
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             async with client.stream(
                 "POST",

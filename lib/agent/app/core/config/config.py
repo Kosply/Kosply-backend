@@ -52,6 +52,9 @@ class Settings:
     max_waiters: int
     model_timeout_s: float
     queue_timeout_s: float
+    internal_api_key: str
+    stream_timeout_s: float
+    recursion_limit: int
     compaction_max_messages: int
     compaction_threshold_pct: float
     compaction_context_total: int
@@ -88,6 +91,14 @@ def load_settings() -> Settings:
         max_inflight=_parse_int(os.getenv("AI_MAX_INFLIGHT"), 50),
         max_waiters=_parse_int(os.getenv("AI_MAX_WAITERS"), 200),
         model_timeout_s=_parse_float(os.getenv("AI_MODEL_TIMEOUT_S"), 120.0),
+        # Shared secret required from the server on every /ai/* call. Unset means
+        # every request is refused (fail closed), so a missing value can never
+        # re-open an unauthenticated agent.
+        internal_api_key=os.getenv("INTERNAL_API_KEY") or "",
+        # The SSE path had no run ceiling at all, so a stalled stream held one of
+        # the in-flight slots forever and 50 stalls wedged the service.
+        stream_timeout_s=_parse_float(os.getenv("AI_STREAM_TIMEOUT_S"), 300.0),
+        recursion_limit=_parse_int(os.getenv("AI_RECURSION_LIMIT"), 40),
         queue_timeout_s=_parse_float(os.getenv("AI_QUEUE_TIMEOUT_S"), 5.0),
         compaction_max_messages=_parse_int(os.getenv("AI_COMPACTION_MAX_MESSAGES"), 30),
         compaction_threshold_pct=_parse_float(os.getenv("AI_COMPACTION_THRESHOLD_PCT"), 75.0),

@@ -3,6 +3,7 @@
 from httpx import ASGITransport, AsyncClient
 from langchain_core.messages import AIMessageChunk
 
+from tests.client import agent_headers
 from app.api.chat.streaming import split_thinking
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel
@@ -56,7 +57,8 @@ class ThinkingStreamTest(BaseAgentTest):
 
         self.mount_graph(build_graph(InMemorySaver(), llm=fake))
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test",
+            headers=agent_headers(),
         ) as client:
             async with client.stream(
                 "POST",

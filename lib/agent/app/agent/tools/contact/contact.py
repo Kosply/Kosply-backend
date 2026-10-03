@@ -3,11 +3,11 @@
 
 from typing import Annotated
 
-import httpx
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
 from app.core.config import settings
+from app.core.http import server_post
 from app.core.errors import ToolError
 
 
@@ -20,10 +20,9 @@ def request_seller_contact(
     """Ask a seller to contact you about a product. Requires user approval."""
     buyer_id = (state or {}).get("user_id", "")
     try:
-        resp = httpx.post(
-            f"{settings.kosply_server_url}/api/internal/contact-requests",
+        resp = server_post(
+            "/api/internal/contact-requests",
             json={"productId": product_id, "buyerId": buyer_id, "message": message},
-            timeout=10.0,
         )
         resp.raise_for_status()
     except Exception as exc:

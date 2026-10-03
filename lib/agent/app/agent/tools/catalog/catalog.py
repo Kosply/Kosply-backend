@@ -2,11 +2,10 @@
 HTTP API — never the database directly (monorepo `lib/` rule).
 """
 
-import httpx
 from langchain_core.tools import tool
 
-from app.core.config import settings
 from app.core.errors import ToolError
+from app.core.http import server_get
 
 
 @tool
@@ -17,11 +16,7 @@ def search_catalog(query: str, max_price: int | None = None, category: str | Non
     Price/category filter here (server returns the raw list).
     """
     try:
-        resp = httpx.get(
-            f"{settings.kosply_server_url}/api/internal/products/search",
-            params={"q": query},
-            timeout=10.0,
-        )
+        resp = server_get("/api/internal/products/search", params={"q": query})
         resp.raise_for_status()
     except Exception as exc:
         raise ToolError(f"catalog search failed: {exc}") from exc
@@ -41,10 +36,7 @@ def search_catalog(query: str, max_price: int | None = None, category: str | Non
 def get_product_detail(product_id: str) -> str:
     """Get one product (price, stock, location, seller) by its id."""
     try:
-        resp = httpx.get(
-            f"{settings.kosply_server_url}/api/internal/products/{product_id}",
-            timeout=10.0,
-        )
+        resp = server_get(f"/api/internal/products/{product_id}")
         resp.raise_for_status()
     except Exception as exc:
         raise ToolError(f"product detail failed: {exc}") from exc
