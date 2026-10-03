@@ -28,7 +28,7 @@ lib/server/
   tests/shared/         # cross-cutting suites (error catalog + handlers)
 ```
 
-Domains: `auth` (incl. password reset), `products`, `ai` (incl. internal),
+Domains: `auth` (incl. password reset), `products`, `analytics`, `ai` (incl. internal),
 `verifications`, `chat` (COD), `support`, `reports`, `admin`, `models`.
 Shared roots only: `health.*`, pipeline middlewares, `config/`.
 
@@ -88,6 +88,36 @@ npm start               # single instance on :3000
 - `POST /api/products` → seller create (JWT + role SELLER)
 - `PATCH /api/products/:id` → owner or ADMIN update
 - `DELETE /api/products/:id` → soft archive (owner or ADMIN)
+- `PATCH /api/products/:id/sold` → mark sold (owner or ADMIN); stamps `soldAt`, zeroes `stock`, idempotent
+
+## Analytics (seller catalog numbers)
+
+- `POST /api/analytics/products/:id/event?type=IMPRESSION|CLICK&source=feed|search|share|detail` → record an event (public; optional JWT attributes the viewer)
+- `GET /api/analytics/seller?days=1..365` → per-product rows + catalog totals (JWT, own catalog only)
+- `GET /api/analytics/products/:id?days=1..365` → one product (owner or ADMIN)
+
+Metrics per product: `impressions`, `clicks`, `clickThroughRate` (clicks /
+impressions), `inquiries` (distinct buyer chat rooms), `inquiryMessages`
+(buyer-authored bubbles only, so a chatty seller cannot inflate their own
+number), `sales`, `salesValue`, `conversionRate` (sales / clicks). Totals are
+always re-derived from the item rows, never accumulated separately.
+
+Inquiries and sales are **derived**, not stored: inquiries come from
+`Conversation` + buyer `Message` rows, sales from `Product.status = SOLD`.
+Only impressions/clicks need a new table (`ProductEvent`).
+
+There is deliberately **no** platform revenue/profit math — Kosply is COD and
+money moves off-platform, so `salesValue` is the seller's own gross only.
+
+POC limits, revisit before production:
+- The ingest dedupe window is in-process (`Map` + TTL), so it resets on
+  restart and is per-PM2-worker. The server has no `express-rate-limit`
+  anywhere, so a real deployment needs a shared limiter (Redis) or a DB-side
+  unique key before anonymous ingest is trustworthy.
+- Feed/search surfaces are **not** auto-instrumented. Implicit writes on
+  anonymous routes are a free amplification vector; the client fires events
+  explicitly instead.
+- `sellerOverview` caps at 500 products per seller (`VALIDATION` beyond).
 
 ## Verification, chat, support, reports, admin, password, models, users, notifications
 
