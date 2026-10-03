@@ -11,12 +11,16 @@
 # @dev cannot silently run a CLI that predates the committed source.
 #
 # Usage: ./scripts/server.sh <staging|main> [start|stop|restart|status]
+#        ./scripts/server.sh dev            # foreground, no PM2
 #
 set -euo pipefail
 
 # Resolve the project root (parent of this script's directory).
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+# shellcheck source=_common.sh
+[ -f "$ROOT/scripts/_common.sh" ] && . "$ROOT/scripts/_common.sh"
 
 ENV_NAME="${1:-}"
 ACTION="${2:-start}"
@@ -25,9 +29,27 @@ APP="kosply-server-$ENV_NAME"
 
 usage() {
   echo "Usage: ./scripts/server.sh <staging|main> [start|stop|restart|status]"
+  echo "       ./scripts/server.sh dev"
+  echo
   echo "  ./scripts/server.sh staging           # start staging (:3001)"
   echo "  ./scripts/server.sh main restart      # restart main (:3000)"
+  echo "  ./scripts/server.sh dev               # foreground with --watch, no PM2"
 }
+
+# Foreground development run. Kept here rather than in a new script so there is
+# exactly one entry point for "run the server", and it does not need PM2 or a
+# Go toolchain -- which is what a contributor actually has installed.
+if [ "$ENV_NAME" = "dev" ]; then
+  [ "$ACTION" = "start" ] || { usage >&2; exit 1; }
+  [ -d "$ROOT/node_modules" ] || { echo "[error] run: npm install" >&2; exit 1; }
+  echo "[dev] http://localhost:${PORT:-3000} (ctrl-c to stop)"
+  exec env PORT="${PORT:-3000}" NODE_ENV=development node --watch lib/server/server.js
+fi
+
+if [ "$ENV_NAME" = "-h" ] || [ "$ENV_NAME" = "--help" ] || [ "$ENV_NAME" = "help" ]; then
+  usage
+  exit 0
+fi
 
 if [ "$ENV_NAME" != "staging" ] && [ "$ENV_NAME" != "main" ]; then
   usage >&2

@@ -13,8 +13,12 @@ Kosply-backend/
   ecosystem.config.js       # PM2: 2 apps (staging + main)
   package.json              # root scripts -> lib/server
   .env.example
-  scripts/
-    server.sh             # single launcher: ./scripts/server.sh <staging|main> [start|stop|restart|status]
+  scripts/                # workflow helpers (see scripts/README.md)
+    dev.sh                # local stack: Postgres + server + agent, one ctrl-c
+    server.sh             # server: `dev` foreground, staging/main via PM2
+    db/db.sh              # Prisma + Postgres workflows
+    agent/agent.sh        # venv, run and test the Python agent
+    _common.sh            # shared helpers (env loading, readiness probes)
   lib/
     server/                 # all server code lives here
       server.js             # entrypoint + graceful shutdown
@@ -55,6 +59,28 @@ pm2 status
 ```
 
 ## Scripts
+
+Everything below has a `--help`, and `scripts/README.md` explains the ordering
+rules. The short version:
+
+```bash
+./scripts/dev.sh setup    # install db + root + agent, apply migrations
+./scripts/dev.sh start    # boot the stack
+./scripts/dev.sh logs
+./scripts/dev.sh stop
+```
+
+Prefer these over the raw npm scripts: they apply migrations first, wait for
+readiness instead of sleeping, and stop cleanly on ctrl-c.
+
+- `scripts/dev.sh [setup|start|stop|restart|status|logs|reset]` — local stack
+- `scripts/db/db.sh <install|generate|validate|migrate|deploy|status|reset|drift|seed|studio|testdb|up|down>`
+- `scripts/agent/agent.sh <install|dev|start|test|test:watch|shell|clean>`
+- `scripts/server.sh dev` — foreground with `--watch`, needs neither PM2 nor Go
+- `scripts/server.sh <staging|main> [start|stop|restart|status]` — PM2 launcher
+
+npm equivalents, kept for convenience:
+
 - `dev` / `start` — local dev on `:3000` (uses `.env`)
 - `dev:staging` / `start:staging` — staging simulation on `:3001`
 - `start:main` — main simulation, single instance on `:3000`
