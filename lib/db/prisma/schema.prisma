@@ -45,6 +45,14 @@ enum ProductStatus {
   ARCHIVED
 }
 
+/// @notice Catalog event recorded for seller analytics.
+/// @dev IMPRESSION = the listing was shown in a feed/search.
+/// @dev CLICK = a buyer opened the product detail. CTR = CLICK / IMPRESSION.
+enum ProductEventType {
+  IMPRESSION
+  CLICK
+}
+
 /// @notice COD chat message type (buyer <-> seller directly, no payment gateway).
 enum MessageType {
   TEXT
@@ -122,8 +130,6 @@ model User {
   supportMessagesSent   SupportMessage[]     @relation("SupportMessagesSent")
   reportsMade           Report[]             @relation("ReportsMade")
   reportsReceived       Report[]             @relation("ReportsReceived")
-  reportsReviewed       Report[]             @relation("ReportsReviewed")
-  verificationsReviewed SellerVerification[] @relation("VerificationsReviewed")
   passwordResets        PasswordReset[]
   aiConversations       AiConversation[]
   notifications         Notification[]
@@ -149,8 +155,7 @@ model SellerVerification {
   isActive        Boolean            @default(true) /// active/non-active flag: false = frozen, cannot sell
   action          VerificationAction @default(NONE) /// APPROVE | REJECT by admin (executed in service/admin)
   actionNote      String? /// approve/reject reason
-  reviewedBy      String? /// deciding admin
-  reviewedByUser  User?              @relation("VerificationsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedBy      String? /// deciding admin id. Opaque audit field, NOT a users FK: the deciding admin may be an `admins` (dashboard) row, whose id namespace is disjoint from `users`. Enforcing a FK here made the entire review path 500 with P2003.
   rejectionReason String?
   reviewedAt      DateTime?
   createdAt       DateTime           @default(now())
@@ -177,15 +182,41 @@ model Product {
   longitude     Float?
   locationLabel String? /// location label, e.g. boarding-house / campus area
   status        ProductStatus  @default(ACTIVE)
+  soldAt        DateTime? /// filled when status flips to SOLD, so sales can be bucketed by date
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   conversations Conversation[]
   reports       Report[]
+  events        ProductEvent[]
 
   @@index([sellerId])
   @@index([status])
   @@index([category])
+  @@index([sellerId, status])
+  @@index([sellerId, soldAt])
+  @@index([status, createdAt])
   @@map("products")
+}
+
+/// @notice One analytics event on a product (seller dashboard numbers).
+/// @dev Rows are append-only and never exposed publicly; the seller reads
+/// @dev aggregated counts via /api/analytics, never these rows.
+/// @dev viewerId is a plain TEXT (no FK): deleting a viewer must not delete
+/// @dev the seller's historical numbers, and the viewer may be anonymous.
+/// @dev source names the surface that produced the event (feed, search, share).
+model ProductEvent {
+  id        String           @id @default(cuid())
+  productId String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      ProductEventType
+  viewerId  String? /// null = anonymous, otherwise the browsing user id
+  source    String           @default("unknown") /// feed | search | share | detail
+  createdAt DateTime         @default(now())
+
+  @@index([productId, type, createdAt])
+  @@index([productId, createdAt])
+  @@index([type, createdAt])
+  @@map("product_events")
 }
 
 /// @notice COD chat room per product: 1 buyer x 1 product = 1 room.
@@ -264,8 +295,13 @@ model SupportMessage {
   id         String        @id @default(cuid())
   ticketId   String
   ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId   String
-  sender     User          @relation("SupportMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  /// @dev Nullable on purpose: a dashboard operator lives in `admins`, not
+  /// @dev `users`, so a NOT NULL `users` FK here made every dashboard reply
+  /// @dev fail with P2003. `senderRole` + `senderName` keep it attributable.
+  senderId   String?
+  sender     User?         @relation("SupportMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  senderRole String        @default("BUYER") /// role at send time: BUYER | ADMIN | SUPER_ADMIN
+  senderName String? /// display-name snapshot, so a deleted sender stays readable
   text       String        @db.Text
   imageUrl   String? /// screenshot / evidence, optional
   isInternal Boolean       @default(false)
@@ -295,8 +331,7 @@ model Report {
   status            ReportStatus   @default(PENDING)
   action            ReportAction   @default(NONE) /// WARNING | DELETE_PRODUCT | BAN_USER (executed in service/admin)
   actionNote        String? /// admin action reason
-  reviewedBy        String? /// handling admin
-  reviewedByUser    User?          @relation("ReportsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedBy        String? /// handling admin id. Opaque audit field, NOT a users FK — see SellerVerification.reviewedBy.
   reviewedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
