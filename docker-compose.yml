@@ -1,45 +1,140 @@
+# Kosply local/staging data tier + AI agent.
+# Security posture (fixed in the 2026-09 audit pass):
+#  - Postgres is no longer published on 0.0.0.0 with a committed `kosply:kosply`
+#    credential. The Node server runs under PM2 on the host and connects over
+#    127.0.0.1, so the port is bound to loopback only.
+#  - Credentials come from the environment (a gitignored `.env`), not literals.
+#  - The agent is reachable only on the compose network; it is not published to
+#    the host, and it now requires INTERNAL_API_KEY on the server side.
+#  - The agent is given a least-privilege role, not the Postgres superuser: it
+#    ingests buyer-controlled text into an LLM, so it should not be able to
+#    read or write the production database.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: kosply-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kosply
-      POSTGRES_PASSWORD: kosply
-      POSTGRES_DB: kosply_dev
+      POSTGRES_USER: ${POSTGRES_USER:-kosply}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-kosply_dev}
+      # Create the staging/main databases and a least-privilege agent role.
+      POSTGRES_MULTIPLE_DATABASES: kosply_staging,kosply_main,kosply_agent
+      # Read by 01-init.sh to create the kosply_agent role's password.
+      AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:-kosply}
+    # Loopback only. `5432:5432` bound every interface, so anyone who could
+    # route to the host reached the database with a publicly known password.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./lib/db/docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # Only init.sh goes in docker-entrypoint-initdb.d. The postgres image
+      # executes EVERY .sql in that directory itself, with a bare `psql -f` and
+      # no variables, so keeping init.sql there too ran it a second time
+      # without `-v agent_password` and it died on `:'agent_password'`.
+      - ./lib/db/docker/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - ./lib/db/docker/init.sql:/kosply-init/01-init.sql:ro
+    networks:
+      - data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kosply -d kosply_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kosply} -d ${POSTGRES_DB:-kosply_dev}"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 20s
+    # Default `json-file` logging has no size cap; a full disk stops Postgres
+    # writing, which is a cascading outage.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 30s
+
+  # One-shot: create the agent database's schema.
+  #
+  # `init.sql` creates `kosply_agent` EMPTY (deliberately: the agent gets its
+  # own database and its own least-privilege role, so it cannot read
+  # `kosply_main`). But the agent's ownership check queries `ai_conversations`,
+  # a Prisma model, so an unmigrated agent database made EVERY /ai/* route
+  # return 503 OwnershipCheckUnavailable while /health stayed green, and the
+  # server's `ai_conversations`/`ai_messages` rows were never written.
+  migrate-agent:
+    image: node:22-bookworm-slim
+    container_name: kosply-migrate-agent
+    restart: "no"
+    working_dir: /db
+    volumes:
+      - ./lib/db:/db
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kosply}:${AGENT_DB_PASSWORD:-kosply}@postgres:5432/kosply_agent?schema=public
+    command: >
+      sh -c "npm install --no-audit --no-fund --loglevel=error prisma@6 @prisma/client@6 &&
+             npx prisma generate && npx prisma migrate deploy"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
 
   agent:
     build: ./lib/agent
     container_name: kosply-agent
     restart: unless-stopped
+    # Loopback only. The agent used to be published on 0.0.0.0:8000 with no
+    # authentication, so anyone who could reach the host could spend the LLM
+    # key and read any conversation. It is bound to 127.0.0.1 for the same
+    # reason Postgres is: the server runs on the HOST and defaults to
+    # `aiAgentUrl: http://localhost:8000`, so with `expose:` only (no reverse
+    # proxy in this repo) every /api/ai/* route returned 503 ECONNREFUSED.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
     environment:
       PORT: 8000
-      DATABASE_URL: postgresql://kosply:kosply@postgres:5432/kosply_dev?schema=public
+      NODE_ENV: ${AGENT_NODE_ENV:-development}
+      # Least-privilege role created by init.sql, not the superuser.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kosply}:${AGENT_DB_PASSWORD:-kosply}@postgres:5432/kosply_agent?schema=public
       KOSPLY_SERVER_URL: http://host.docker.internal:3000
-      AI_MODEL: openai:gpt-4o-mini
+      # Shared secret the server requires on /api/internal/*.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-openai:gpt-4o-mini}
       AI_RATE_LIMIT_PER_MIN: 60
     extra_hosts:
       - host.docker.internal:host-gateway
     depends_on:
       postgres:
         condition: service_healthy
+      migrate-agent:
+        condition: service_completed_successfully
+    networks:
+      - data
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s
       timeout: 5s
       retries: 5
+      # The agent boots LangGraph and a psycopg pool at import; without a
+      # start_period it latches `unhealthy` and `restart: unless-stopped`
+      # does not act on `unhealthy`.
+      start_period: 60s
+      start_interval: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Runs as the non-root user created in the Dockerfile.
+    user: "10001:10001"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  data:
+    driver: bridge
 
 volumes:
   pgdata:
