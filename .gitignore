@@ -1,14 +1,36 @@
 node_modules/
+# `.env` matched a file literally named `.env` at any depth, but `.env.production`,
+# `.env.local` and `.env.staging` were all committable — and this project is
+# explicitly multi-env.
 .env
+.env.*
+!.env.example
 logs/
 *.log
 .DS_Store
 
-# OAuth client files (never commit credentials)
+# Credential files (never commit)
 client_secret_*.json
+*.pem
+*.key
+*.p12
+*.keystore
+service-account*.json
+*.env
+
+# Per-machine PM2 overrides: the documented home for the real secrets, which
+# must not be in the committed ecosystem.config.js.
+ecosystem.local.js
+
+# Test / coverage output
+coverage/
+.pytest_cache/
 
 # Go build output
 lib/server-monitoring/kosmon
 
 # Local Postman workspace state (personal workspace id, regenerates)
 .postman/
+
+# Local Postman collections can embed live tokens
+postman/*.local.json

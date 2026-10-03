@@ -1,4 +1,8 @@
-# Kosply CI: Express server + kosmon CLI + helper scripts.
+# Kosply CI: Express server + database + kosmon CLI + helper scripts.
+# The database job is not optional: without a live Postgres every DB-backed test
+# skips, `node --test` reports a skip as a pass, and the whole data layer ships
+# unverified. That gap hid the auth, ownership and moderation defects fixed in
+# the 2026-09 security pass.
 name: CI
 
 on:
@@ -6,95 +10,220 @@ on:
     branches: [main, master, develop]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_ENV: test
+  # Required by the internal-API guard; the internal tests assert 401 without it.
+  INTERNAL_API_KEY: ci-internal-key
+  # A value that is not the dev default, so the production guard does not trip.
+  JWT_SECRET: ci-only-not-a-real-secret-0123456789
+
 jobs:
   server:
     name: Express server
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kosply
+          POSTGRES_PASSWORD: kosply
+          POSTGRES_DB: kosply_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kosply"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: |
+            package-lock.json
+            lib/db/package-lock.json
+      - name: Install server dependencies
         run: npm ci
-      - name: Syntax check (node)
+
+      - name: Install db dependencies
+        working-directory: lib/db
+        run: npm ci
+
+      - name: Generate the Prisma client
+        working-directory: lib/db
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+
+      - name: Apply migrations (the deploy path does this too)
+        working-directory: lib/db
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+
+      - name: Create the shadow database used by the drift check
+        working-directory: lib/db
         run: |
-          for f in lib/server/server.js lib/server/app.js lib/server/config/env.js \
-                   lib/server/config/db.js lib/server/routes/index.js lib/server/routes/health.route.js \
-                   lib/server/routes/ai/ai.route.js lib/server/routes/ai/internal.route.js \
-                   lib/server/routes/auth/auth.route.js lib/server/routes/auth/password.route.js \
-                   lib/server/routes/products/product.route.js lib/server/routes/verifications/verification.route.js \
-                   lib/server/routes/chat/chat.route.js lib/server/routes/support/support.route.js \
-                   lib/server/routes/reports/report.route.js lib/server/routes/admin/admin.route.js \
-                   lib/server/routes/models/model.route.js lib/server/routes/users/user.route.js \
-                   lib/server/routes/notifications/notification.route.js lib/server/controllers/health.controller.js \
-                   lib/server/controllers/ai/ai.controller.js lib/server/controllers/ai/internal.controller.js \
-                   lib/server/controllers/auth/auth.controller.js lib/server/controllers/auth/password.controller.js \
-                   lib/server/controllers/products/product.controller.js \
-                   lib/server/controllers/verifications/verification.controller.js \
-                   lib/server/controllers/chat/chat.controller.js lib/server/controllers/support/support.controller.js \
-                   lib/server/controllers/reports/report.controller.js lib/server/controllers/admin/admin.controller.js \
-                   lib/server/controllers/models/model.controller.js lib/server/controllers/users/user.controller.js \
-                   lib/server/controllers/notifications/notification.controller.js \
-                   lib/server/services/auth/auth.service.js lib/server/services/auth/social.service.js \
-                   lib/server/services/auth/password.service.js lib/server/services/products/product.service.js \
-                   lib/server/services/ai/ai.service.js lib/server/services/verifications/verification.service.js \
-                   lib/server/services/chat/chat.service.js lib/server/services/support/support.service.js \
-                   lib/server/services/reports/report.service.js lib/server/services/admin/admin.service.js \
-                   lib/server/services/models/model.service.js lib/server/services/users/user.service.js \
-                   lib/server/services/notifications/notification.service.js lib/server/middlewares/auth/auth.js \
-                   lib/server/middlewares/notFound.js lib/server/middlewares/errorHandler.js \
-                   lib/server/middlewares/asyncHandler.js lib/server/middlewares/errorCatalog.js \
-                   lib/server/tests/shared/errors.test.js lib/server/tests/ai/ai.test.js \
-                   lib/server/tests/ai/internal.test.js lib/server/tests/ai/internal_chat.test.js \
-                   lib/server/tests/auth/auth.test.js lib/server/tests/auth/social.test.js \
-                   lib/server/tests/auth/password.test.js lib/server/tests/products/products.test.js \
-                   lib/server/tests/verifications/verification.test.js lib/server/tests/chat/chat.test.js \
-                   lib/server/tests/chat/wait.test.js \
-                   lib/server/tests/support/support.test.js lib/server/tests/reports/reports.test.js \
-                   lib/server/tests/admin/admin.test.js lib/server/tests/models/models.test.js \
-                   lib/server/tests/users/users.test.js lib/server/tests/admin/segmentation.test.js \
-                   lib/server/tests/notifications/notifications.test.js \
-                   lib/db/src/selects.js lib/db/src/client.js \
-                   lib/db/tests/selects.test.js lib/db/tests/client.test.js \
-                   lib/db/tests/schema.test.js lib/db/tests/seed.test.js \
-                   lib/db/prisma/seed.js \
-                   ecosystem.config.js; do
-            node --check "$f"
-          done
-      - name: Unit tests (node:test, no DB)
+          echo 'CREATE DATABASE kosply_shadow;' > /tmp/shadow.sql
+          npx prisma db execute --file /tmp/shadow.sql --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+
+      - name: Assert the schema matches the migration history (no drift)
+        working-directory: lib/db
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://kosply:kosply@localhost:5432/kosply_shadow?schema=public" \
+            --exit-code
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+
+      - name: Seed fixtures
+        working-directory: lib/db
+        run: node prisma/seed.js
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          NODE_ENV: test
+
+      # A hand-maintained list of files rots silently: the next file added is
+      # simply not checked. `npm test` requires every test module (and therefore
+      # every module they import), and the smoke test below boots the app, so a
+      # syntax error anywhere is caught without enumerating paths.
+      - name: Syntax check (every tracked js file)
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do node --check "$f"; done < <(git ls-files '*.js' ':!:node_modules' ':!lib/agent/**')
+          echo "checked $(git ls-files '*.js' ':!:node_modules' ':!lib/agent/**' | wc -l) files"
+
+      - name: Unit + integration tests (node:test, with a real database)
         run: npm test
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+
+      # These two cases assert the *degraded* path (no DB configured), so they
+      # only run when DATABASE_URL is unset. With it set workflow-wide they
+      # skipped forever and the degradation behaviour was untested.
+      - name: Degraded-mode tests (no database configured)
+        run: node --test --test-timeout=60000 lib/server/tests/ai/ai.test.js lib/server/tests/ai/internal.test.js
+        env:
+          NODE_ENV: test
+          INTERNAL_API_KEY: ${{ env.INTERNAL_API_KEY }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+        continue-on-error: false
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
       - name: Syntax check (shell)
         run: bash -n scripts/server.sh
-      - name: Smoke test (boot + health)
+
+      - name: Smoke test (boot + health + a database-backed route)
+        env:
+          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
         run: |
+          set -uo pipefail
           PORT=3100 node lib/server/server.js > /tmp/kosply-smoke.log 2>&1 &
           SRV=$!
-          sleep 2
+          trap 'kill $SRV 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:3100/api/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          cat /tmp/kosply-smoke.log
           curl -sf http://localhost:3100/ | grep -q kosply-backend
           curl -sf http://localhost:3100/api/health | grep -q '"status":"ok"'
-          kill $SRV
+          # The old smoke test only hit dependency-free endpoints, so it passed
+          # with a completely dead database. This one proves Prisma is wired.
+          curl -sf 'http://localhost:3100/api/models' | grep -q '"status":"ok"'
+          # And that the internal API is not open.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/api/internal/users/anyone)
+          test "$code" = "401" || { echo "internal API returned $code, expected 401"; exit 1; }
+
+  agent:
+    name: AI agent (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: lib/agent/requirements*.txt
+      - name: Install dependencies
+        working-directory: lib/agent
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      # The agent suite was never run by CI at all: 100+ tests, including the
+      # security suite, only ran if a developer remembered.
+      - name: Agent test suite
+        working-directory: lib/agent
+        run: pytest tests/ -q
+        env:
+          # Fail-closed is asserted too: the suite passes with the key unset,
+          # because every /ai/* route must then refuse.
+          INTERNAL_API_KEY: ci-internal-key
+          OPENAI_API_KEY: ci-dummy-not-a-real-key
+      - name: Python syntax + import check
+        working-directory: lib/agent
+        run: |
+          python -m compileall -q app
+          python -c "import app.main"
+      - name: Python dependency audit
+        working-directory: lib/agent
+        run: pip install pip-audit && pip-audit -r requirements.txt || true
+      - name: Agent image builds
+        run: docker build -t kosply-agent:ci -f lib/agent/Dockerfile lib/agent
 
   monitor:
     name: kosmon CLI (Go)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: lib/server-monitoring
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
+          # No `cache-dependency-path`: the module has no external dependencies,
+          # so no go.sum is ever generated and pointing at one makes the whole
+          # job fail before it runs a single check.
           go-version-file: lib/server-monitoring/go.mod
-      - name: Format check
-        run: test -z "$(gofmt -l .)"
-      - name: Vet
-        run: go vet ./...
-      - name: Build + smoke
+      - name: gofmt
+        working-directory: lib/server-monitoring
+        # `test -z "$(gofmt -l .)"` passes when gofmt itself fails, because a
+        # parse error goes to stderr and stdout stays empty.
         run: |
-          go build -o kosmon .
-          ./kosmon version
-          ./kosmon list
-          ./kosmon help
+          out=$(gofmt -e -l . 2>&1) || true
+          echo "$out"
+          if echo "$out" | grep -q '\.go'; then
+            echo "gofmt reported unformatted files"
+            exit 1
+          fi
+      - name: go vet
+        working-directory: lib/server-monitoring
+        run: go vet ./...
+      - name: go build
+        working-directory: lib/server-monitoring
+        run: go build -o /tmp/kosmon .
+      - name: kosmon smoke (non-interactive)
+        working-directory: lib/server-monitoring
+        run: |
+          /tmp/kosmon list > /dev/null
+          # `kosmon test` used to exit 0 on a 5xx, so `kosmon test X && deploy`
+          # was a no-op gate.
+          if /tmp/kosmon test /api/health --env staging >/dev/null 2>&1; then
+            echo "kosmon test exited 0 with no server running (expected non-zero)"
+            exit 1
+          fi

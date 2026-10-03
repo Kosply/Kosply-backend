@@ -115,6 +115,7 @@ See `lib/server-monitoring/README.md` for details.
 - ~~DB (Prisma)~~ done — `lib/db` + migrations + seed
 - ~~Auth (JWT), products, AI proxy~~ done — `/api/auth/*`, `/api/products*`, `/api/ai/*`
 - ~~Verification, COD chat, support, reports, admin, password reset, models~~ done — see `lib/server/WIRING.md`
+- ~~Seller catalog analytics~~ POC done — `/api/analytics` (impressions, clicks, CTR, inquiries, sales)
 - Validation (zod)
 - Logger (pino)
 - Model selector flow UI → db → agent (see `lib/agent/agent_spec/tables/model_selector.md`)
