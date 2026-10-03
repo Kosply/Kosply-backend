@@ -21,22 +21,22 @@ class PersonaMappingTest(BaseAgentTest):
 
     def test_seller_persona(self):
         """SELLER (any case) yields the seller mode block."""
-        self.assertIn("[MODE: PENJUAL]", persona_for("seller"))
+        self.assertIn("[MODE: SELLER]", persona_for("seller"))
 
     def test_buyer_persona(self):
         """BUYER yields the buyer mode block."""
-        self.assertIn("[MODE: PEMBELI]", persona_for("BUYER"))
+        self.assertIn("[MODE: BUYER]", persona_for("BUYER"))
 
     def test_unknown_is_neutral(self):
         """Missing/unknown roles fall back to neutral (never crash)."""
         for role in (None, "", "UNKNOWN", "ADMIN"):
-            self.assertIn("[MODE: UMUM]", persona_for(role))
+            self.assertIn("[MODE: GENERAL]", persona_for(role))
 
     def test_prompt_combines_scope_and_persona(self):
         """Built prompt keeps the Kosply scope plus the persona."""
         prompt = build_system_prompt(SYSTEM_PROMPT, "SELLER")
         self.assertIn("Kosply", prompt)
-        self.assertIn("[MODE: PENJUAL]", prompt)
+        self.assertIn("[MODE: SELLER]", prompt)
 
 
 class PersonaWiringTest(BaseAgentTest):
@@ -47,14 +47,14 @@ class PersonaWiringTest(BaseAgentTest):
         fake = StatefulFakeChatModel(responses=[canned_answer("ok")])
         graph = build_graph(InMemorySaver(), llm=fake)
         await self.loop(graph, [("send", "halo")], role="SELLER")
-        self.assertIn("[MODE: PENJUAL]", fake.seen_inputs[0][0].content)
+        self.assertIn("[MODE: SELLER]", fake.seen_inputs[0][0].content)
 
     async def test_buyer_mode_reaches_model(self):
         """user_role=BUYER puts the buyer block first in the LLM input."""
         fake = StatefulFakeChatModel(responses=[canned_answer("ok")])
         graph = build_graph(InMemorySaver(), llm=fake)
         await self.loop(graph, [("send", "halo")], role="BUYER")
-        self.assertIn("[MODE: PEMBELI]", fake.seen_inputs[0][0].content)
+        self.assertIn("[MODE: BUYER]", fake.seen_inputs[0][0].content)
 
     async def test_role_persists_for_resume(self):
         """Persona survives across turns on one thread (no re-send needed)."""
@@ -64,7 +64,7 @@ class PersonaWiringTest(BaseAgentTest):
         graph = build_graph(InMemorySaver(), llm=fake)
         await self.loop(graph, [("send", "halo"), ("send", "lanjut")], role="SELLER")
         for seen in fake.seen_inputs:
-            self.assertIn("[MODE: PENJUAL]", seen[0].content)
+            self.assertIn("[MODE: SELLER]", seen[0].content)
 
     def test_role_tool_registered_plain(self):
         """get_user_role is a plain (non-sensitive) registered tool."""
@@ -76,7 +76,7 @@ class PersonaWiringTest(BaseAgentTest):
     def test_ensure_keeps_role_param(self):
         """Helper stays backward compatible without a role."""
         [first] = ensure_system_prompt([])
-        self.assertIn("[MODE: UMUM]", first.content)
+        self.assertIn("[MODE: GENERAL]", first.content)
 
 
 class PersonaRouteTest(BaseAgentTest):

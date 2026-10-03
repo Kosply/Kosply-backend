@@ -5,7 +5,14 @@ prompt-injection shapes before any LLM call, while `SYSTEM_PROMPT` makes the
 model itself refuse off-topic messages by explaining what Kosply is.
 
 The prompt text lives in `system_prompt.md` (same folder) so it can be
-edited without touching Python; it is loaded once at import.
+edited without touching Python; it is loaded once at import. It is written in
+English because it is read by the model, not by the user.
+
+The canned replies below are the opposite case: they are shown to the user
+verbatim, before any model call, so they cannot follow "reply in the user's
+language" -- there is no model involved yet. They are bilingual so an
+English-speaking user still understands a refusal. Indonesian leads because it
+is the primary audience.
 """
 
 import re
@@ -23,14 +30,24 @@ SYSTEM_PROMPT = _load_system_prompt()
 
 REJECTION_MESSAGE = (
     "Maaf, itu di luar topik Kosply jadi saya tolak ya. Kosply adalah "
-    "marketplace barang second-hand khusus mahasiswa — buat jual-beli barang "
-    "bekas, COD-an langsung, verifikasi penjual pakai KTM, dan ada bantuan "
-    "support. Mau dibantu cari barang, pasang lapak, atau verifikasi?"
+    "marketplace barang second-hand khusus mahasiswa: jual-beli barang bekas, "
+    "COD langsung dengan penjual, verifikasi penjual via KTM, plus bantuan "
+    "support. / Sorry, that is outside Kosply. Kosply is a second-hand "
+    "marketplace for students: buy and sell used goods, COD with the seller, "
+    "seller verification via student ID, plus support. Mau bantu cari barang, "
+    "pasang lapak, atau verifikasi? / Want help finding an item, listing "
+    "something, or verifying?"
 )
 
-TOO_LONG_MESSAGE = "Pesan terlalu panjang (maks 2000 karakter). Coba persingkat ya."
+TOO_LONG_MESSAGE = (
+    "Pesan terlalu panjang (maks 2000 karakter), coba persingkat ya. / "
+    "Message too long (max 2000 characters), please shorten it."
+)
 
-EMPTY_MESSAGE = "Pesan kosong — tulis dulu yang mau ditanyain seputar Kosply."
+EMPTY_MESSAGE = (
+    "Pesan kosong, tulis dulu yang mau ditanyain seputar Kosply. / "
+    "Empty message, tell me what you want to know about Kosply."
+)
 
 # Prompt-injection shapes (matched case-insensitively against lowered input).
 INJECTION_PATTERNS = [

@@ -3,11 +3,15 @@
 File: `app/agent/policy/personas/` (`personas.py`). The agent reads the caller role and
 switches personality: seller mode vs buyer mode.
 
+The persona text is English because it is read by the model, not shown to the user.
+It does **not** fix the answer language: the base prompt tells the model to reply in
+whatever language the user wrote in.
+
 | Role | Persona | Helps with |
 |---|---|---|
-| `SELLER` | `[MODE: PENJUAL]` | listing copy, second-hand pricing, stock, buyer replies, KTM verification, seller-side COD safety |
-| `BUYER` | `[MODE: PEMBELI]` | product search, price comparison, condition checks, polite negotiation, COD safety, fraud reporting |
-| anything else | `[MODE: UMUM]` | neutral Kosply help for both sides |
+| `SELLER` | `[MODE: SELLER]` | listing copy, second-hand pricing, stock, buyer replies, KTM verification, seller-side COD safety |
+| `BUYER` | `[MODE: BUYER]` | product search, price comparison, condition checks, polite negotiation, COD safety, fraud reporting |
+| anything else | `[MODE: GENERAL]` | neutral Kosply help for both sides |
 
 ## Wiring
 
