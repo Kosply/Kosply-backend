@@ -1,0 +1,8 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/analytics/products/{{productId}}/event?type=IMPRESSION&source=feed'
+description: 'Public, anonymous (optional JWT). Deduplicated per viewer inside a window, so a repeat returns "deduped" instead of double-counting. Feeds the seller dashboard. Rate limited to 120/min.'
+order: 3400
+headers:
+  - key: Content-Type
+    value: application/json

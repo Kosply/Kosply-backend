@@ -1,0 +1,8 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/stream'
+description: 'Server-sent events for a COD room. text/event-stream -- Postman will buffer it rather than show it live, so use curl -N. Compression is bypassed for this content type on purpose.'
+order: 4210
+headers:
+  - key: Accept
+    value: text/event-stream

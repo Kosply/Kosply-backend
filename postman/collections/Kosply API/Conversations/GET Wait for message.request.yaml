@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/wait?timeout=5'
+description: 'Long poll that returns as soon as a message arrives, or after the timeout. No cursor replays history first, then waits for anything new. Needs a client that tolerates an idle socket (curl, not Postman).'
+order: 4200
+headers: []

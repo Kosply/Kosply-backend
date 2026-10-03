@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/ai/wait/{{conversationId}}?timeout=5'
+description: 'Event-based long poll for a pending human approval. Returns resolved | timeout | noop with remainingS. NOTE: Postman cannot hold a long poll comfortably -- prefer curl. Needs the agent up.'
+order: 5100
+headers: []

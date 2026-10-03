@@ -1,6 +1,6 @@
 $kind: http-request
 method: POST
-url: '{{baseUrl}}/api/verifications/:id/review'
+url: '{{baseUrl}}/api/verifications/{{verificationId}}/review'
 description: 'APPROVE promotes to SELLER; REJECT needs rejectionReason. Replace :id. ADMIN only.'
 order: 4300
 headers:

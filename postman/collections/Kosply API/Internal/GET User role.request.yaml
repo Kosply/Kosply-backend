@@ -3,4 +3,6 @@ method: GET
 url: '{{baseUrl}}/api/internal/users/{{userId}}'
 description: 'Agent machine API: public fields + role (captured userId).'
 order: 10200
-headers: []
+headers:
+  - key: x-internal-key
+    value: '{{internalApiKey}}'

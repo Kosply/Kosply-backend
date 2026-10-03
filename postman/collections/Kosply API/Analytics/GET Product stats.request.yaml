@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/analytics/products/{{productId}}?days=7'
+description: 'One product. Owner or ADMIN only; ownership is re-read server-side. Sales come from the immutable soldAt, never from the mutable status.'
+order: 3420
+headers: []

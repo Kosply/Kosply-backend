@@ -1,0 +1,18 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/internal/contact-requests'
+description: 'Backs the approval-gated request_seller_contact tool. NOTE: intake only -- it returns 202 and creates no chat room and sends no notification yet.'
+order: 10400
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: x-internal-key
+    value: '{{internalApiKey}}'
+body:
+  type: json
+  content: |-
+    {
+      "productId": "{{productId}}",
+      "buyerId": "{{userId}}",
+      "message": "Halo, masih tersedia?"
+    }

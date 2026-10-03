@@ -13,3 +13,5 @@ body:
       "senderId": "{{userId}}",
       "message": { "text": "deal 100rb" }
     }
+  - key: x-internal-key
+    value: '{{internalApiKey}}'

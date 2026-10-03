@@ -3,4 +3,6 @@ method: GET
 url: '{{baseUrl}}/api/internal/products/{{productId}}'
 description: 'Agent machine API: detail + public seller.'
 order: 10100
-headers: []
+headers:
+  - key: x-internal-key
+    value: '{{internalApiKey}}'

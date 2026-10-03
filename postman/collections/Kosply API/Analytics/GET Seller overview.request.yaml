@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/analytics/seller?days=7'
+description: 'Seller-wide totals for the window: impressions, clicks, CTR, inquiries, sales. Owner-scoped from the JWT. Products are scoped by activity (created, sold, or traffic in the window), so a listing uploaded long ago but sold today still counts.'
+order: 3410
+headers: []
