@@ -27,17 +27,49 @@ type Endpoint struct {
 
 // Registry returns every known API route. It must be kept in sync with
 // lib/server/routes (add new modules here when the server grows).
+//
+// Only GET routes are listed because kosmon can only issue GET|HEAD|DELETE|
+// OPTIONS and cannot attach a bearer token. Routes marked "needs JWT" are kept
+// for discoverability: calling them without a token returns 401, which is the
+// correct behaviour and is itself worth confirming. The previous registry
+// listed 11 of the server's routes, so `kosmon list` was missing most of the
+// API, and 5 of the 11 it did list were permanently unusable (literal ":id"
+// placeholders, or JWT-gated).
 func Registry() []Endpoint {
 	return []Endpoint{
 		{Method: "GET", Path: "/", Description: "Root health (name, status, env)"},
 		{Method: "GET", Path: "/api/health", Description: "Service health (uptime, timestamp)"},
-		{Method: "GET", Path: "/api/internal/products/search?q=", Description: "Catalog search (agent)"},
-		{Method: "GET", Path: "/api/internal/products/:id", Description: "Product detail (agent)"},
-		{Method: "GET", Path: "/api/internal/users/:id", Description: "Public user + role (agent)"},
-		{Method: "GET", Path: "/api/internal/conversations/:id/messages", Description: "COD history (agent nego)"},
-		{Method: "GET", Path: "/api/products", Description: "Public catalog"},
-		{Method: "GET", Path: "/api/products/:id", Description: "Public product detail"},
-		{Method: "GET", Path: "/api/models", Description: "Active AI models (selector)"},
+
+		// Public catalog.
+		{Method: "GET", Path: "/api/products", Description: "Public catalog (q?, limit?)"},
+		{Method: "GET", Path: "/api/models", Description: "Active AI models (public)"},
+		{Method: "GET", Path: "/api/users/:id", Description: "Public profile (needs a real id)"},
+		{Method: "GET", Path: "/api/analytics/seller", Description: "Seller catalog analytics (needs JWT: 401 here)"},
+		{Method: "GET", Path: "/api/analytics/products/:id", Description: "Per-product analytics (needs JWT: 401 here)"},
+
+		// Authenticated reads.
+		{Method: "GET", Path: "/api/users/me", Description: "Own profile (needs JWT: 401 here)"},
+		{Method: "GET", Path: "/api/notifications", Description: "Own notification inbox (needs JWT)"},
+		{Method: "GET", Path: "/api/notifications/preferences", Description: "Notification toggles (needs JWT)"},
+		{Method: "GET", Path: "/api/conversations", Description: "COD inbox (needs JWT)"},
+		{Method: "GET", Path: "/api/conversations/:id", Description: "One COD room (needs JWT + membership)"},
+		{Method: "GET", Path: "/api/conversations/:id/messages", Description: "Room history (needs JWT + membership)"},
+		{Method: "GET", Path: "/api/conversations/:id/wait", Description: "Long-poll for new messages (needs JWT)"},
+		{Method: "GET", Path: "/api/conversations/:id/stream", Description: "SSE message stream (needs JWT)"},
+		{Method: "GET", Path: "/api/verifications/me", Description: "Own KTM application status (needs JWT)"},
+		{Method: "GET", Path: "/api/verifications", Description: "All applications (needs ADMIN: 403 here)"},
+		{Method: "GET", Path: "/api/reports", Description: "Fraud report queue (needs ADMIN: 403 here)"},
+		{Method: "GET", Path: "/api/support/tickets", Description: "Support tickets (needs ADMIN for all: 403 here)"},
+		{Method: "GET", Path: "/api/support/tickets/:id", Description: "One ticket (needs JWT)"},
+		{Method: "GET", Path: "/api/ai/conversations", Description: "Own AI session list (needs JWT)"},
+		{Method: "GET", Path: "/api/ai/history/:id", Description: "AI transcript (needs JWT + ownership)"},
+		{Method: "GET", Path: "/api/ai/wait/:id", Description: "Long-poll a pending AI approval (needs JWT)"},
+
+		// Internal machine API. Every route requires the x-internal-key header,
+		// so an anonymous call must return 401 -- that assertion is enforced in
+		// the server test suite, not here.
+		{Method: "GET", Path: "/api/internal/products/search?q=", Description: "Catalog search (agent; needs x-internal-key: 401 here)"},
+		{Method: "GET", Path: "/api/internal/users/:id", Description: "User + role lookup (agent; needs x-internal-key: 401 here)"},
 	}
 }
 
@@ -87,12 +119,19 @@ func Call(env, method, path string) (Result, error) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
-	return Result{
+	result := Result{
 		Env:      target.Env,
 		Method:   m,
 		URL:      url,
 		Status:   resp.StatusCode,
 		Duration: time.Since(start),
 		Body:     string(body),
-	}, nil
+	}
+	// A 4xx/5xx is a failed test, not a transport detail. `kosmon test` used to
+	// exit 0 on a 500, which made `kosmon test X && <deploy>` a no-op gate: the
+	// only non-zero exit was "connection refused".
+	if resp.StatusCode >= 400 {
+		return result, fmt.Errorf("%s %s -> HTTP %d", m, path, resp.StatusCode)
+	}
+	return result, nil
 }

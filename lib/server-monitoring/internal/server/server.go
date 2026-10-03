@@ -127,43 +127,82 @@ func envNames() string {
 // States maps every managed env to its PM2 status
 // (online|stopped|stopping|missing). A missing pm2 yields an error.
 func States() (map[string]string, error) {
-	out, err := runPM2("jlist")
-	if err != nil {
-		// jlist exits non-zero when the daemon has no processes; treat
-		// empty output as "everything missing" instead of failing.
-		if strings.TrimSpace(out) == "" || strings.TrimSpace(out) == "[]" {
-			return missingStates(), nil
-		}
-		return nil, err
+	out, _ := runPM2("jlist")
+	// `pm2 jlist` can exit non-zero on an empty daemon *and* exit zero while
+	// printing nothing (wrapper scripts, a redirected PM2_HOME, non-TTY progress
+	// output). The empty check used to sit inside the error branch, so a clean
+	// but empty pm2 hard-failed every start/restart/switch.
+	if strings.TrimSpace(out) == "" || strings.TrimSpace(out) == "[]" {
+		return missingStates(), nil
 	}
 	var entries []pmEntry
 	if err := json.Unmarshal([]byte(out), &entries); err != nil {
 		return nil, fmt.Errorf("parse pm2 jlist: %w", err)
 	}
 	states := missingStates()
+	// In cluster mode one PM2 name has N entries. Taking the *last* match made
+	// the verdict purely positional: 3 of 4 workers errored still reported
+	// "online" as long as the healthy one came last, so `switch`/`restart` acted
+	// on a false "healthy". Report the worst status seen.
 	for _, t := range Targets() {
 		for _, e := range entries {
-			if e.Name == t.PM2Name {
-				states[t.Env] = e.PM2Env.Status
+			if e.Name != t.PM2Name {
+				continue
+			}
+			if worstState(states[t.Env], e.PM2Env.Status) != states[t.Env] {
+				states[t.Env] = worstState(states[t.Env], e.PM2Env.Status)
 			}
 		}
 	}
 	return states, nil
 }
 
+// severity orders PM2 statuses so a cluster is judged by its worst worker.
+func severity(status string) int {
+	switch status {
+	case "errored", "launching", "stopping", "crashed":
+		return 3
+	case "stopped":
+		return 2
+	case "online":
+		return 1
+	default: // "missing" and anything unknown
+		return 0
+	}
+}
+
+// worstState returns whichever of the two states is less healthy.
+func worstState(current, candidate string) string {
+	if current == "missing" {
+		return candidate
+	}
+	if severity(candidate) > severity(current) {
+		return candidate
+	}
+	return current
+}
+
 // ensureRunning starts the target when absent, restarts it when present.
 // A registered-but-stopped process must be restarted (not started),
 // otherwise `pm2 start --only` fails with "already exists".
+// A process that is *already online* is left alone: `switch` used to restart a
+// perfectly healthy staging, dropping in-flight requests for no reason.
+// `startOrRestart` is used so an edited ecosystem.config.js is actually applied
+// (`pm2 restart <name>` reuses PM2's stored config and silently ignores env
+// edits), with --update-env so the operator's shell environment reaches it.
 func ensureRunning(t Target) error {
 	states, err := States()
 	if err != nil {
 		return err
 	}
 	if states[t.Env] == "missing" {
-		_, err = runPM2("start", "ecosystem.config.js", "--only", t.PM2Name)
+		_, err = runPM2("start", "ecosystem.config.js", "--only", t.PM2Name, "--update-env")
 		return err
 	}
-	_, err = runPM2("restart", t.PM2Name)
+	if states[t.Env] == "online" {
+		return nil
+	}
+	_, err = runPM2("startOrRestart", "ecosystem.config.js", "--only", t.PM2Name, "--update-env")
 	return err
 }
 
@@ -193,13 +232,28 @@ func Stop(env string) error {
 	return err
 }
 
-// Restart restarts the given environment.
+// Restart force-restarts the given environment.
+//
+// Unlike ensureRunning this is the explicit operator command, so it must always
+// bounce the process -- including when it is already online, which is the point
+// of a restart. It goes through `startOrRestart ecosystem.config.js` with
+// `--update-env` for the same reason as ensureRunning: `pm2 restart <name>`
+// replays PM2's stored config, so a new connection pool size, worker count or
+// env edit in ecosystem.config.js / config/env.js was silently discarded and
+// the operator had no way to apply it.
 func Restart(env string) error {
 	t, err := TargetFor(env)
 	if err != nil {
 		return err
 	}
-	_, err = runPM2("restart", t.PM2Name)
+	states, err := States()
+	if err != nil {
+		return err
+	}
+	if states[t.Env] == "missing" {
+		return fmt.Errorf("%s is not registered in PM2", t.PM2Name)
+	}
+	_, err = runPM2("startOrRestart", "ecosystem.config.js", "--only", t.PM2Name, "--update-env")
 	return err
 }
 
