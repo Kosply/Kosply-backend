@@ -1,148 +1,235 @@
 # Kosply-backend
 
-Kosply backend — Express + PM2. Server focus for now.
+Kosply — marketplace barang second-hand untuk mahasiswa. Backend monorepo: satu
+Express API, satu AI agent (Python/FastAPI), satu skema database (Prisma), plus
+CLI monitoring (Go).
 
 ## Stack
-- Node >=18, Express 4 (stable)
-- helmet, cors, compression, morgan, dotenv
-- PM2 process manager via `ecosystem.config.js`
+
+| Bagian | Teknologi |
+|---|---|
+| `lib/server` | Node >=18, Express 4 |
+| `lib/agent` | Python >=3.10, FastAPI, LangGraph, uvicorn |
+| `lib/db` | PostgreSQL 16, Prisma 6 |
+| `lib/server-monitoring` | Go, stdlib only (`kosmon`) |
+| Proses | PM2 (`ecosystem.config.js`) |
+
+Server: `helmet`, `cors`, `compression`, `morgan`, `dotenv`, `jsonwebtoken`,
+`bcryptjs`, `google-auth-library`, `jwks-rsa`.
 
 ## Structure
+
 ```
 Kosply-backend/
-  ecosystem.config.js       # PM2: 2 apps (staging + main)
-  package.json              # root scripts -> lib/server
+  ecosystem.config.js       # PM2: kosply-server-staging + kosply-server-main
+  docker-compose.yml        # Postgres + agent (+ one-shot agent migration)
+  package.json
   .env.example
-  scripts/                # workflow helpers (see scripts/README.md)
-    dev.sh                # local stack: Postgres + server + agent, one ctrl-c
-    server.sh             # server: `dev` foreground, staging/main via PM2
-    db/db.sh              # Prisma + Postgres workflows
-    agent/agent.sh        # venv, run and test the Python agent
-    _common.sh            # shared helpers (env loading, readiness probes)
+  scripts/                  # workflow helpers, see scripts/README.md
+    dev.sh                  # local stack: Postgres + server + agent, one ctrl-c
+    server.sh               # server: `dev` foreground, staging/main via PM2
+    db/db.sh                # Prisma + Postgres workflows
+    agent/agent.sh          # venv, run and test the Python agent
+    _common.sh              # shared helpers (env loading, readiness probes)
   lib/
-    server/                 # all server code lives here
+    server/                 # Express API — the whole public surface
       server.js             # entrypoint + graceful shutdown
-      app.js                # Express setup (global middleware)
-      config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN)
+      app.js                # global middleware (helmet, cors, body, routes)
+      config/               # env + Prisma client lifecycle
       routes/               # index.js aggregator + *.route.js per module
-      controllers/          # per-module logic (req/res)
-      middlewares/          # notFound, errorHandler, asyncHandler
-    server-monitoring/      # Go kosmon CLI (test APIs, control PM2)
+      controllers/          # thin HTTP layer (req/res)
+      services/             # business logic + shared/validators.js
+      middlewares/          # auth, errorHandler, notFound, asyncHandler,
+                           #   internalKey, rateLimit
+      tests/                # node:test, grouped per module
+    agent/                  # AI agent — internal, never public
+      app/main.py           # FastAPI app + middleware order
+      app/api/              # /ai/chat, /stream, /resume, /wait, /history
+      app/agent/            # LangGraph: tools, policy, memory, personas
+      app/core/             # config, errors, limits, http (outbound auth)
+      agent_spec/tables/    # per-subsystem design notes
+      tests/
+    db/                     # schema + migrations are the source of truth
+      prisma/schema.prisma
+      prisma/migrations/
+      prisma/seed.js
+      docker/init.sh|.sql   # cluster bootstrap
+      docker/checks.sql     # data-integrity constraints (post-migrate)
+      src/selects.js        # shared read shapes
+    server-monitoring/      # kosmon CLI
+  postman/                  # collection + specs
 ```
 
-Why `lib/server/` instead of `src/`? So `lib/` can later hold sibling runtimes
-(`lib/agent/` for Python, `lib/shared/`, etc.) without refactoring the root.
-Current runtimes: `lib/server/` (Node) + `lib/server-monitoring/` (Go).
-
-## Code documentation
-All source files use NatSpec-style docblocks (`@title`, `@notice`, `@dev`,
-`@param`, `@return`) so behavior, side effects, and contracts are visible
-right above each module and function during development.
+`lib/` holds sibling runtimes rather than `src/` so each language keeps its own
+tooling. The agent reaches the server only over HTTP (`/api/internal/*`), never
+the database — that rule is what makes the split possible.
 
 ## Getting started
-```bash
-cp .env.example .env
-npm install
-
-# Local (no PM2)
-npm run dev             # dev on :3000 (.env)
-npm run dev:staging     # staging simulation on :3001
-npm start               # single instance on :3000
-npm run start:staging   # single instance on :3001
-
-# PM2 via single helper script (recommended, delegates to kosmon when built)
-./scripts/server.sh staging
-# test http://localhost:3001/api/health
-./scripts/server.sh main
-
-pm2 status
-```
-
-## Scripts
-
-Everything below has a `--help`, and `scripts/README.md` explains the ordering
-rules. The short version:
 
 ```bash
+cp .env.example .env      # then fill in DATABASE_URL, JWT_SECRET, INTERNAL_API_KEY
 ./scripts/dev.sh setup    # install db + root + agent, apply migrations
-./scripts/dev.sh start    # boot the stack
+./scripts/dev.sh start    # Postgres + server :3000 + agent :8000
 ./scripts/dev.sh logs
 ./scripts/dev.sh stop
 ```
 
-Prefer these over the raw npm scripts: they apply migrations first, wait for
-readiness instead of sleeping, and stop cleanly on ctrl-c.
+`setup` is the one command you need. It installs all three components and
+applies migrations; `start` on its own tells you to run it.
 
-- `scripts/dev.sh [setup|start|stop|restart|status|logs|reset]` — local stack
-- `scripts/db/db.sh <install|generate|validate|migrate|deploy|status|reset|drift|seed|studio|testdb|up|down>`
-- `scripts/agent/agent.sh <install|dev|start|test|test:watch|shell|clean>`
-- `scripts/server.sh dev` — foreground with `--watch`, needs neither PM2 nor Go
-- `scripts/server.sh <staging|main> [start|stop|restart|status]` — PM2 launcher
+To run just the server in the foreground (no PM2, no Go toolchain):
 
-npm equivalents, kept for convenience:
+```bash
+./scripts/server.sh dev
+```
 
-- `dev` / `start` — local dev on `:3000` (uses `.env`)
-- `dev:staging` / `start:staging` — staging simulation on `:3001`
-- `start:main` — main simulation, single instance on `:3000`
-- `scripts/server.sh <staging|main> [start|stop|restart|status]` — single PM2 launcher (uses `kosmon` when built)
-- `pm2:start` — run staging + main together
-- `pm2:start:staging` / `pm2:start:main` — run one of them
-- `pm2:stop / pm2:restart / pm2:logs` (plus `:staging` / `:main`) — manage per env
+See `scripts/README.md` for every command and for why the startup order is
+Postgres → migrations → server → agent.
+
+## Testing
+
+```bash
+npm test                      # server + db (needs DATABASE_URL)
+./scripts/agent/agent.sh test # agent (pytest)
+./scripts/db/db.sh drift      # migrations must reproduce schema.prisma
+```
+
+`npm test` sets `RATE_LIMIT=off`: the suite drives many auth attempts in one
+process and would otherwise trip its own throttling.
+`tests/shared/rate_limit.test.js` re-enables it and asserts the real behaviour.
+
+CI additionally runs the agent suite, `prisma migrate deploy` against a real
+Postgres, and the drift gate.
 
 ## Env
-| Key | Local | Staging (PM2) | Main (PM2) |
+
+| Key | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | Prisma + the agent's checkpointer |
+| `JWT_SECRET` | yes (production) | Production boot **fails** if unset or left at the published dev value |
+| `INTERNAL_API_KEY` | yes | Guards `/api/internal/*` (the agent → server API) |
+| `NODE_ENV` | no | `development` \| `staging` \| `production` |
+| `PORT` | no | digits only, 1-65535, fallback `3000` |
+| `TRUST_PROXY_HOPS` | no | `0` by default. Must be set behind a load balancer |
+| `CORS_ORIGIN` | no | comma list; `*` unless you set a real origin |
+| `AI_AGENT_URL` | no | default `http://localhost:8000` |
+| `POSTGRES_*`, `AGENT_DB_PASSWORD` | docker | cluster bootstrap; `AGENT_DB_PASSWORD` must match the agent's `DATABASE_URL` |
+
+The agent has its own set (`AI_MODEL`, `AI_MODEL_TIMEOUT_S`, `OPENAI_API_KEY`,
+`KOSPLY_SERVER_URL`, …) — see `lib/agent/.env.example`.
+
+Per environment:
+
+| | Local | Staging | Main |
 |---|---|---|---|
 | `NODE_ENV` | `development` | `staging` | `production` |
 | `PORT` | `3000` | `3001` | `3000` |
-| `CORS_ORIGIN` | `*` | `*` | `*` (set the real domain on go-live) |
+| Database | `kosply_dev` | `kosply_staging` | `kosply_main` |
 
-Notes: `PORT` is strictly validated (digits only, 1-65535, fallback `3000`);
-`CORS_ORIGIN` comma-list is trimmed (`a.com, b.com` works); `app.js` sets
-`trust proxy: 1` and `1mb` body limits.
+## Health
 
-## Health check
-- `GET /` → `{ name: kosply-backend, status: ok, env }`
-- `GET /api/health` → `{ status: ok, service, uptime, timestamp }`
+- `GET /` → `{ name, status, env }`
+- `GET /api/health` → `{ status, service, uptime, timestamp }`, dependency-free
+  so it stays green when something downstream is down
+- On the agent (container-only, bound to loopback):
+  - `GET /health` → `{ status, service }` — liveness
+  - `GET /readyz` → 200 when the checkpointer answers, `degraded` on the
+    in-memory saver. This is the probe that catches a broken database, which
+    `/health` cannot: the agent boots fine and answers `/health` while every
+    real request fails its ownership check.
+
+## Architecture notes
+
+**Identity comes from the JWT, always.** `authenticate` re-reads role and
+`isActive` from the database on every request, so a ban takes effect immediately
+rather than when the token expires. Dashboard operators live in `admins`, users
+in `users`; the two id namespaces are disjoint and the token's `kind` says which
+one to resolve.
+
+**Three tiers of trust.** Public Flutter traffic → `authenticate`. Staff →
+`requireRole`. The agent → `x-internal-key` on `/api/internal/*`.
+
+**The agent cannot act on a user's behalf without approval.** `SENSITIVE_TOOLS`
+(`send_chat_message`, `request_seller_contact`) pause the LangGraph through
+`interrupt()`; the client resumes with `POST /ai/chat/resume`. Approval is
+consent for an *action*, never for an *identity*: the acting user is read from
+graph state, so an approved "send this message" cannot be redirected at someone
+else. `lib/agent/agent_spec/tables/human_in_the_loop.md` has the full contract.
+
+**Rate limiting** is per-surface: login 10/15min keyed on IP *and* normalised
+email, password reset 5/15min, register 10/hour, public analytics ingest
+120/min. Counters are in-process, so under PM2 the ceiling is roughly
+`limit × instances` — a shared store is the production answer.
+
+**No user input reaches Prisma unvalidated.** `services/shared/validators.js`
+(`toId`, `toText`, `toNumber`, `toQueryInt`) is the boundary, including for ids
+the *model* chose.
 
 ## Adding a new module
-1. Create `lib/server/routes/<name>.route.js` (wrap handlers with `asyncHandler` so async throws reach `errorHandler`)
-2. Create `lib/server/controllers/<name>.controller.js`
-3. Register it in `lib/server/routes/index.js`: `router.use('/<name>', require('./<name>.route'))`
-4. Keep controllers thin — extract a `services/` layer once business logic grows.
-5. Mirror new routes in `lib/server-monitoring/internal/api/api.go` `Registry()` so `kosmon list` stays complete.
 
-## PM2 notes
-- `kosply-server-staging` — `fork`, 1 instance, `:3001`. Playground: test freely, restart anytime.
-- `kosply-server-main` — `cluster` (`instances: max`), `:3000`. Serves real users, never test here directly.
-- `server.js` handles `SIGTERM`/`SIGINT` + `unhandledRejection`/`uncaughtException` with graceful shutdown, safe for `pm2 restart/reload`.
-- `ecosystem.config.js` sets `kill_timeout: 12000` (covers the 10s graceful window), `autorestart: true`, `time: true`.
-- Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001` → pass → `./scripts/server.sh main restart`.
+1. `lib/server/routes/<name>/<name>.route.js` — wrap handlers in `asyncHandler`
+2. `lib/server/controllers/<name>/<name>.controller.js` — keep it thin
+3. `lib/server/services/<name>/<name>.service.js` — business logic
+4. Register in `lib/server/routes/index.js`
+5. Mirror the route in `lib/server-monitoring/internal/api/api.go` `Registry()`
+   so `kosmon list` stays complete
+6. Tests in `lib/server/tests/<name>/`
+
+Choose the middleware deliberately: `authenticate`, `requireRole`,
+`optionalAuthenticate` (owner-or-anonymous reads), `requireInternalKey`, and
+`rateLimit` when the route is expensive or guessable.
+
+Every file carries a docblock (`@title`, `@notice`, `@dev`, `@param`,
+`@return`). `@dev` is where the reasoning and the bug history live — please keep
+writing *why*, not *what*.
+
+## PM2
+
+- `kosply-server-staging` — `fork`, 1 instance, `:3001`. Test freely here.
+- `kosply-server-main` — `cluster`, up to 4 instances, `:3000`. Real users.
+- Instance count and pool size are derived from `DB_CONNECTION_LIMIT` so the
+  workers fit inside Postgres' per-database ceiling.
+- `server.js` handles `SIGTERM`/`SIGINT` plus `unhandledRejection` and
+  `uncaughtException` with a graceful shutdown, safe for `pm2 restart`.
+- Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001`
+  → pass → `./scripts/server.sh main restart`.
 
 ## Server monitoring CLI (Go)
 
-`lib/server-monitoring/` (`kosmon`) tests APIs and controls staging/main.
-Stdlib only. Two versions:
+`kosmon` tests APIs and drives PM2. Stdlib only.
 
 ```bash
-cd lib/server-monitoring
-go build -o kosmon .
-
-./kosmon                                # interactive: ASCII banner + version + menu
-./kosmon list                           # list all APIs
-./kosmon test /api/health --env staging # call an endpoint (methods: GET|HEAD|DELETE|OPTIONS)
+cd lib/server-monitoring && go build -o kosmon .
+./kosmon                                 # interactive
+./kosmon list                            # all registered APIs
+./kosmon test /api/health --env staging  # GET|HEAD|DELETE|OPTIONS
 ./kosmon start|stop|restart <staging|main>
-./kosmon switch main                     # run main, stop staging
+./kosmon switch main
 ```
 
-Set `KOSPLY_ROOT` if auto-detection of the project root fails.
-See `lib/server-monitoring/README.md` for details.
+Set `KOSPLY_ROOT` if project-root detection fails.
 
-## Next
-- ~~DB (Prisma)~~ done — `lib/db` + migrations + seed
-- ~~Auth (JWT), products, AI proxy~~ done — `/api/auth/*`, `/api/products*`, `/api/ai/*`
-- ~~Verification, COD chat, support, reports, admin, password reset, models~~ done — see `lib/server/WIRING.md`
-- ~~Seller catalog analytics~~ POC done — `/api/analytics` (impressions, clicks, CTR, inquiries, sales)
-- Validation (zod)
-- Logger (pino)
-- Model selector flow UI → db → agent (see `lib/agent/agent_spec/tables/model_selector.md`)
-- Email delivery for OTP (currently dev-logged)
+## Known gaps
+
+Honest list of what is *not* finished:
+
+- `POST /api/internal/contact-requests` validates and returns `202`, but
+  creates no chat room and sends no notification. `request_seller_contact` is
+  approval-gated and currently does nothing on the other side.
+- Password reset generates a 4-digit code; there is no mailer, so it is never
+  delivered. Needs an SMTP provider.
+- A pending approval interrupt has no TTL — an approval left open accumulates in
+  the checkpointer until the thread is reused.
+- Rate-limit counters are per-process (see Architecture notes).
+- `CORS_ORIGIN` still defaults to `*`; set a real origin before go-live.
+
+## Docs
+
+| Where | What |
+|---|---|
+| `lib/server/WIRING.md` | endpoint → backing data map, both directions |
+| `lib/server/README.md` | server detail |
+| `lib/agent/README.md` | agent detail |
+| `lib/agent/agent_spec/tables/` | per-subsystem design notes |
+| `lib/db/README.md` | schema and migration workflow |
+| `scripts/README.md` | every script, and the ordering rules |
