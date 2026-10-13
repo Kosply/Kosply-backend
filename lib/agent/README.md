@@ -10,7 +10,7 @@ The agent never touches the marketplace database. Its tools call the server's
 
 - Python >= 3.10, FastAPI, uvicorn, SSE (`sse-starlette`)
 - LangGraph 1.2 (`StateGraph`, `ToolNode`, `interrupt`/`Command`)
-- Checkpointer: Postgres (`langgraph-checkpoint-postgres`) with in-memory fallback
+- Checkpointer: MySQL/MariaDB (`langgraph-checkpoint-mysql`) with in-memory fallback
 - Model: any OpenAI-compatible provider via `init_chat_model` (`AI_MODEL`)
 - Every `/ai/*` route requires `x-internal-key`; the agent fails closed when the
   key is unset. It is never published publicly — compose binds it to loopback.
@@ -26,7 +26,7 @@ lib/agent/
   app/
     main.py               # entrypoint: lifespan (memory setup + graph compile) + routes
     core/                 # cross-cutting, one folder per function
-      config/             # config.py (strict env loader) + dsn.py (pg_dsn for raw drivers)
+      config/             # config.py (strict env loader) + dsn.py (mysql_dsn for raw drivers)
       errors/             # errors.py (AgentError hierarchy + handlers)
       limits/             # ratelimit.py (429) + caps.py (413 body cap, 503/504 bounded runs)
       security.py         # inbound x-internal-key check (fails closed)

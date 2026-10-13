@@ -8,7 +8,7 @@ could pin megabytes per turn in the checkpointer and drive unbounded rows.
 
 from pydantic import BaseModel, Field
 
-# `conversation_id` is used as a Postgres primary key (`ai_conversations.id`,
+# `conversation_id` is used as a SQL primary key (`ai_conversations.id`,
 # `thread_id`) and as a URL path segment, so it is a cuid/uuid in practice.
 ID_MAX = 64
 ID_PATTERN = r"^[A-Za-z0-9_-]+$"

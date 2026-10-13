@@ -48,28 +48,44 @@ async def lifespan(app: FastAPI):
         # starve every connection in the system.
         app.state.db = None
         if settings.database_url:
+            pool = None
             try:
-                from psycopg_pool import AsyncConnectionPool
+                # aiomysql's pool exposes `acquire()` (an async context
+                # manager). `mysql_conn_kwargs` is exported from the
+                # app.core.config PACKAGE: an earlier psycopg version imported
+                # the helper from a sibling module, the resulting ImportError
+                # was swallowed below, `app.state.db` stayed None, and the
+                # ownership check was skipped on every request in every
+                # deployment.
+                import aiomysql
 
-                # `pg_dsn` is exported from the app.core.config PACKAGE. An
-                # earlier version imported it from `app.core.config.dsn`, which
-                # exists, but a sibling module had imported it from
-                # history_store (where it is only a local import) - the
-                # resulting ImportError was swallowed below, `app.state.db`
-                # stayed None, and the ownership check was skipped on every
-                # request in every deployment.
-                from app.core.config import pg_dsn
+                from app.core.config import mysql_conn_kwargs
 
-                pool = AsyncConnectionPool(
-                    pg_dsn(settings.database_url), min_size=1, max_size=8
+                pool = await aiomysql.create_pool(
+                    minsize=1,
+                    maxsize=8,
+                    # The ownership check is a read-only SELECT; autocommit
+                    # keeps stray transactions from pinning pooled
+                    # connections.
+                    autocommit=True,
+                    **mysql_conn_kwargs(settings.database_url),
                 )
-                await pool.open(wait=True, timeout=10.0)
+                # Verify connectivity now (create_pool fills lazily); a dead
+                # database must warn at boot, not on the first request.
+                async with pool.acquire() as probe:
+                    await probe.ping()
                 app.state.db = pool
                 print("[agent] ownership pool ready")
             except Exception as exc:  # pragma: no cover - boot degradation
                 # Loud, because a missing pool means the ownership check is
                 # inert. The server still checks ownership in Prisma first, so
                 # this is defence in depth rather than the only barrier.
+                if pool is not None:
+                    try:
+                        pool.close()
+                        await pool.wait_closed()
+                    except Exception:
+                        pass
                 print(
                     f"[agent] WARNING ownership pool unavailable "
                     f"({exc!r}); /ai/* ownership is NOT enforced by the agent"
@@ -83,7 +99,9 @@ async def lifespan(app: FastAPI):
         pool = getattr(app.state, "db", None)
         if pool is not None:
             try:
-                await pool.close()
+                # aiomysql: close() is sync, wait_closed() drains the sockets.
+                pool.close()
+                await pool.wait_closed()
             except Exception:
                 pass
         await close_saver(None, None, None)

@@ -1,6 +1,6 @@
 # Kosply DB Spec
 
-Source: `lib/db/prisma/schema.prisma` (Postgres 16 + Prisma 6). Status: **implemented** — every table below exists in the schema and passes `prisma validate + generate`.
+Source: `lib/db/schema/schema.db` (MariaDB 11.4 + Prisma 6). Status: **implemented** — every table below exists in the schema and passes `prisma validate + generate`.
 
 ## Table list
 

@@ -78,7 +78,7 @@ wait_for_http() {
 }
 
 # @notice Block until a TCP port accepts connections, or fail.
-# @dev For services with no useful health endpoint, and for Postgres.
+# @dev For services with no useful health endpoint, and for MariaDB.
 wait_for_port() {
   local host="$1" port="$2" label="$3" timeout="${4:-60}"
   local waited=0

@@ -9,7 +9,7 @@ Opt-in only (costs real model calls + needs live infra):
       .venv/bin/python -m pytest tests/e2e/test_live_lifecycle.py -v
 
 Requires: server booted with DATABASE_URL (+ seeded dev-product-1),
-agent DATABASE_URL for the Postgres checkpointer, and model credentials
+agent DATABASE_URL for the MySQL checkpointer, and model credentials
 (OPENAI_API_KEY / base URL in lib/agent/.env).
 """
 
@@ -62,7 +62,7 @@ class LiveTestCase(BaseAgentTest):
 
 
 class LiveLifecycleTest(LiveTestCase):
-    """Full lifecycle against live server + live model + Postgres memory."""
+    """Full lifecycle against live server + live model + MySQL memory."""
 
     def _require_live(self):
         if os.getenv("E2E_LIVE_AI") != "1":
@@ -73,7 +73,7 @@ class LiveLifecycleTest(LiveTestCase):
         except Exception as exc:
             self.fail(f"live server unreachable at {settings.kosply_server_url}: {exc}")
         if not settings.database_url:
-            self.fail("DATABASE_URL is required for the Postgres checkpointer")
+            self.fail("DATABASE_URL is required for the MySQL checkpointer")
         return True
 
     def _register_temp_user(self):
@@ -90,14 +90,21 @@ class LiveLifecycleTest(LiveTestCase):
 
     def _cleanup_user(self, email):
         """Delete the temp user (cascades conversations, messages, resets)."""
-        from psycopg import Connection
+        import pymysql
 
-        from app.core.config import pg_dsn
+        from app.core.config import mysql_conn_kwargs
 
-        with Connection.connect(pg_dsn(settings.database_url)) as conn:
+        kwargs = mysql_conn_kwargs(settings.database_url)
+        # pymysql renamed `db` to `database`; pass the current name to stay
+        # warning-free.
+        kwargs["database"] = kwargs.pop("db")
+        conn = pymysql.connect(**kwargs)
+        try:
             with conn.cursor() as cur:
-                cur.execute('DELETE FROM "users" WHERE "email" = %s', (email,))
+                cur.execute("DELETE FROM `users` WHERE `email` = %s", (email,))
             conn.commit()
+        finally:
+            conn.close()
 
     async def _invoke(self, graph, payload, thread):
         """One graph turn with a hard ceiling (hung models fail, never hang)."""

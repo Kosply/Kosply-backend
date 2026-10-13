@@ -10,7 +10,7 @@ directly — they communicate over HTTP.
 |---|---|---|
 | `server/` | Node (Express) | The public HTTP API: staging `:3001`, main `:3000` |
 | `agent/` | Python (FastAPI + LangGraph) | Internal AI service: chat, streaming, human approval |
-| `db/` | Node (Prisma) + Postgres 16 | Schema, migrations, shared read shapes (a library, not a process) |
+| `db/` | Node (Prisma) + MariaDB 11.4 | Schema, migrations, shared read shapes (a library, not a process) |
 | `server-monitoring/` | Go (`kosmon` CLI) | Test endpoints, drive staging/main through PM2 |
 
 There is also `postman/` at the repository root: the API catalog, checked
@@ -44,7 +44,7 @@ Details live in each folder's README:
    fails the build.
 6. **Secrets are environment variables, never committed.** `.env*` is ignored
    except `.env.example`, which holds empty placeholders only. The agent's
-   least-privilege database role is created by `db/docker/init.sql` from
+   least-privilege database role is created by `db/docker/init.sh` from
    `AGENT_DB_PASSWORD`, so it must match that variable.
 
 ## The three trust tiers

@@ -16,7 +16,7 @@
 const os = require('node:os');
 
 /**
- * @dev Postgres' default `max_connections` is 100. Prisma's default pool is
+ * @dev MariaDB's default `max_connections` is 150 (100 on older images). Prisma's default pool is
  * @dev `cpus * 2 + 1` *per worker*, so `instances: 'max'` on a 7+ core box
  * @dev asked for 120+ connections and the database refused with
  * @dev "sorry, too many clients already" (P2037/P2024) — a full outage at the
@@ -24,13 +24,15 @@ const os = require('node:os');
  * @dev against the connection budget instead of the core count.
  */
 /**
- * Per-database ceiling set by lib/db/docker/init.sql. `main` must fit inside
- * it on its own: a previous budget of 4 workers x 12 connections = 48 against
- * `CONNECTION LIMIT 40` still produced "sorry, too many clients already".
+ * Per-process ceiling. `main` must fit inside it on its own: a previous
+ * budget of 4 workers x 12 connections = 48 against Postgres'
+ * `CONNECTION LIMIT 40` still produced "too many clients already". MariaDB
+ * has no per-database connection limit, so this is now purely a
+ * self-imposed budget (and init.sh does not grant CONNECTION LIMIT).
  */
 const DB_CONNECTION_LIMIT = Number.parseInt(process.env.DB_CONNECTION_LIMIT || '40', 10);
 const STAGING_INSTANCES = 1;
-/** @dev Per-worker pool, with room inside the limit for migrations and psql. */
+/** @dev Per-worker pool, with room inside the limit for migrations. */
 const POOL_PER_WORKER = 8;
 const MAIN_INSTANCES = Math.max(
   1,
@@ -42,8 +44,8 @@ const withPool = (url) =>
     ? `${url}&connection_limit=${POOL_PER_WORKER}&pool_timeout=20&connect_timeout=10`
     : `${url}?connection_limit=${POOL_PER_WORKER}&pool_timeout=20&connect_timeout=10`;
 
-const stagingDb = process.env.STAGING_DATABASE_URL || 'postgresql://kosply:kosply@localhost:5432/kosply_staging?schema=public';
-const mainDb = process.env.DATABASE_URL || 'postgresql://kosply:kosply@localhost:5432/kosply_main?schema=public';
+const stagingDb = process.env.STAGING_DATABASE_URL || 'mysql://kosply:kosply@localhost:3306/kosply_staging';
+const mainDb = process.env.DATABASE_URL || 'mysql://kosply:kosply@localhost:3306/kosply_main';
 
 const common = {
   script: './lib/server/server.js',
@@ -59,7 +61,7 @@ const common = {
   // server.js drains for up to 10s, then exits; this leaves margin.
   kill_timeout: 15000,
   // Logs were never rotated, so a busy box filled its disk (and a full disk
-  // stops Postgres writing, which is a cascading outage).
+  // stops MariaDB writing, which is a cascading outage).
   max_log_size: '20M',
   logrotate: true,
   merge_logs: true,

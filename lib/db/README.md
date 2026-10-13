@@ -1,6 +1,6 @@
 # Kosply DB
 
-Postgres + Prisma. A `lib/`-level box next to `server/` — `server/` stays thin
+MariaDB + Prisma. A `lib/`-level box next to `server/` — `server/` stays thin
 and only reads `DATABASE_URL` from the env.
 
 This folder owns the schema, the migration history, and the shared read shapes.
@@ -8,8 +8,8 @@ It is a library, not a running process: nothing here listens on a port.
 
 ## Stack
 
-- Postgres 16 (via the root `docker-compose.yml`)
-- Prisma 6 (`prisma/schema.prisma` + `@prisma/client`)
+- MariaDB 11.4 (via the root `docker-compose.yml`)
+- Prisma 6 (`schema/schema.db` + `@prisma/client`)
 - Node >= 18
 
 ## Structure
@@ -18,14 +18,13 @@ It is a library, not a running process: nothing here listens on a port.
 lib/db/
   package.json              # own manifest: @prisma/client + prisma
   .env.example              # DATABASE_URL samples for dev/staging/main
-  prisma/schema.prisma      # models + enums (English NatSpec)
-  prisma/migrations/        # committed history — the source of truth
-  prisma/seed.js            # idempotent demo data, refuses production
+  schema/schema.db          # models + enums (English NatSpec)
+  schema/migrations/        # committed history — the source of truth
+  schema/seed.js            # idempotent demo data, refuses production
   .db_spec/                 # per-table specs (English, mirrors the schema)
   src/client.js             # PrismaClient singleton
   src/selects.js            # the ONLY whitelisted read shapes
-  docker/init.sh            # cluster bootstrap wrapper (passes psql vars)
-  docker/init.sql           # databases, extensions, least-privilege agent role
+  docker/init.sh            # databases, grants, least-privilege agent role
   docker/checks.sql         # data-integrity constraints; run AFTER migrate
   tests/                    # seed + selects tests
 ```
@@ -37,34 +36,52 @@ Everything here has a wrapper; see the root `scripts/README.md`.
 ```bash
 ./scripts/db/db.sh install     # npm ci + prisma generate
 ./scripts/db/db.sh validate    # static schema check, no database needed
+./scripts/db/db.sh migrate <name>  # create + apply a migration (LOCAL only)
 ./scripts/db/db.sh deploy      # apply pending migrations (use this everywhere)
-./scripts/db/db.sh drift       # fail if migrations != schema.prisma
+./scripts/db/db.sh drift       # fail if migrations != schema.db
 ./scripts/db/db.sh seed        # demo data
 ./scripts/db/db.sh studio      # Prisma Studio
 ./scripts/db/db.sh testdb      # throwaway migrated database
 ```
 
-Use `deploy`, never `migrate`, against staging or main: `prisma migrate dev` can
+Use `deploy`, never `migrate`, against staging or main: creating a migration can
 decide the schema drifted and **reset the database**, which there is data loss.
 
-### Why `init.sh` exists
+`migrate <name>` and `drift` both go through `scripts/db/schema-diff.sh`, which
+replays the committed migrations into the `kosply_shadow` database
+(`docker/init.sh` provisions it) and diffs the result against `schema/schema.db`.
 
-The postgres image runs every `.sql` in `docker-entrypoint-initdb.d` itself,
-with a bare `psql -f` and no variables. `init.sql` needs
-`-v agent_password=...` so the `kosply_agent` role matches the agent's
-`AGENT_DB_PASSWORD`; without it the role silently disagreed with the DSN and the
-agent crash-looped. So only the shell wrapper lives in that directory, and it
-points at `init.sql` mounted elsewhere. Keeping both there made the image run
-the SQL twice, the second time without the variable.
+### Why the `Json` columns are `LONGTEXT` in the migrations
+
+MariaDB has no JSON type: `JSON` is an alias for `LONGTEXT` plus a
+`json_valid()` CHECK constraint, and Prisma introspects the result as
+`String @db.LongText`. Writing `JSON` in the migration therefore left the
+datamodel (`Json`) permanently disagreeing with the database, so every diff
+reported the three columns as "type changed" and would have generated endless
+`MODIFY COLUMN ... JSON NOT NULL` migrations. The migrations declare `LONGTEXT`
+(with the JSON-shaped `DEFAULT '[]'` where the schema declares one), `checks.sql`
+re-adds `JSON_VALID(...)`, and `schema-diff.sh` normalises the datamodel's `Json`
+scalars before diffing. The stored values are still JSON and the Prisma Client
+still does the encode/decode.
+
+### Why `init.sh` is a shell script
+
+The mariadb image runs every file in `docker-entrypoint-initdb.d` on first start
+of an empty volume: `.sh` as a script, `.sql` through a bare client invocation
+with no variable binding. Everything the bootstrap needs (staging/main/agent
+databases, the app role's grants, and `kosply_agent` identified by
+`AGENT_DB_PASSWORD`) is therefore interpolated inside `init.sh` — a separate
+`.sql` would either run twice or run with a password that disagreed with the
+agent's DSN.
 
 ### Why `checks.sql` exists
 
-Cross-database DDL is not a thing in Postgres. An earlier attempt looped over
-database names with `format('ALTER TABLE %I.products ...')`, and `%I` quotes an
-*identifier*, so it produced `ALTER TABLE kosply_main.products` — rejected with
-`schema "kosply_main" does not exist`. The constraints silently never existed.
-They now live in a separate idempotent file that runs once per database, after
-`migrate`, wired into `scripts/server.sh` and `db.sh deploy`.
+Cross-database DDL is not a thing in MariaDB either — grants and objects are
+per-database, so the file runs once per database, after `migrate`, wired into
+`scripts/server.sh` and `db.sh deploy`. MariaDB has no `DO $$ ... $$` blocks
+(those are plpgsql) and `prisma db execute` has no DELIMITER handling, so each
+guard is the plain-SQL idiom: `SET @ddl := IF(<missing>, '<ALTER ...>',
+'SELECT 1'); PREPARE ...; EXECUTE ...; DEALLOCATE ...`.
 
 ## Models
 
@@ -123,10 +140,11 @@ path fail with P2003, so the review transaction could never complete.
   is not sufficient: a rejected or frozen seller must not be able to list.
 - `ktmImageUrl` never leaves via `/api/products` — admin verification endpoints
   only.
-- `price >= 0`, `stock >= 0`, latitude/longitude in range, and
-  `password_resets.attempts >= 0` are enforced by `docker/checks.sql` as well as
-  in the service layer. The database is the last line of defence: `psql`,
-  Prisma Studio and any future writer are not the service layer.
+- `price >= 0`, `stock >= 0`, latitude/longitude in range,
+  `password_resets.attempts >= 0` and JSON validity of the three `Json` columns
+  are enforced by `docker/checks.sql` as well as in the service layer. The
+  database is the last line of defence: Prisma Studio and any future writer are
+  not the service layer.
 - Separate database per environment: `kosply_dev` (local),
   `kosply_staging` (:3001), `kosply_main` (:3000). `kosply_agent` holds only
   the agent's checkpointer and history mirror, under its own least-privilege

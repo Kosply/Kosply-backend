@@ -5,11 +5,12 @@ conversations resumable across turns **and** restarts.
 
 | `DATABASE_URL` | Checkpointer | Resume survives restart |
 |---|---|---|
-| set | `AsyncPostgresSaver` (tables auto-created via `setup()`) | yes |
+| set | `AIOMySQLSaver` (tables auto-created via `setup()`) | yes |
 | empty | `InMemorySaver` dev fallback | no (process memory only) |
 
-> DSN note: Prisma-style `?schema=public` is stripped by `pg_dsn`
-> (`app/core/config/`) before connecting — raw drivers reject unknown params.
+> DSN note: Prisma-only params (`?schema=`, `?connection_limit=` …) are stripped
+> by `mysql_dsn` (`app/core/config/`) before connecting; `mysql_conn_kwargs`
+> parses the same URL into aiomysql/pymysql kwargs.
 
 ## Lifecycle
 
@@ -24,4 +25,4 @@ conversations resumable across turns **and** restarts.
 
 | Case | Result |
 |---|---|
-| Postgres `setup()` fails | `MemoryError` at boot (fail fast, fix DB before serving) |
+| MySQL `setup()` fails | `MemoryError` at boot (fail fast, fix DB before serving) |

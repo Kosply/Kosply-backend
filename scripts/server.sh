@@ -82,15 +82,16 @@ migrate() {
     exit 1
   fi
   echo "[migrate] applying pending migrations to the ${ENV_NAME} database"
-  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma migrate deploy )
+  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma migrate deploy \
+      --schema schema/schema.db )
   # The CHECK constraints can only be added once the tables exist, so they run
-  # after migrate and are written to be idempotent.
-  if command -v psql >/dev/null 2>&1; then
-    echo "[migrate] applying data-integrity constraints"
-    psql "$MIGRATE_URL" -q -v ON_ERROR_STOP=1 -f "$ROOT/lib/db/docker/checks.sql" || {
-      echo "[warn] could not apply checks.sql (psql unavailable or DSN not understood); continuing"
-    }
-  fi
+  # after migrate and are written to be idempotent. `prisma db execute` reads
+  # DATABASE_URL itself, so no mysql/psql client is needed on the host.
+  echo "[migrate] applying data-integrity constraints"
+  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma db execute \
+      --file "$ROOT/lib/db/docker/checks.sql" --schema schema/schema.db ) || {
+    echo "[warn] could not apply checks.sql (the DSN is not understood?); continuing"
+  }
 }
 
 # A prebuilt binary that predates the source silently shadowed the Go code.

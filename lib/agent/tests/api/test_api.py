@@ -88,7 +88,7 @@ class ApiTest(BaseAgentTest):
         self.assertIn("human", roles)
         self.assertIn("ai", roles)
 
-    async def test_readyz_degraded_without_postgres(self):
+    async def test_readyz_degraded_without_database(self):
         """Readiness reports degraded (not down) on the memory checkpointer."""
         self.mount_fake([canned_answer("hai")])
         async with AsyncClient(

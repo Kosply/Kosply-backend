@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 #
 # @title Kosply database workflows (lib/db)
-# @notice Install, migrate, seed and inspect the Prisma schema and Postgres.
+# @notice Install, migrate, seed and inspect the Prisma schema and MariaDB.
 # @dev `migrate deploy` (not `migrate dev`) is what any shared environment uses:
 # @dev `migrate dev` can reset a database when it decides the schema drifted,
 # @dev which on staging or main is data loss. `dev` here is reserved for a local
 # @dev scratch database and says so.
+# @dev `migrate <name>` does not shell out to `prisma migrate dev` either: on
+# @dev MariaDB that creates and drops its own shadow database, which needs a
+# @dev global CREATE privilege the application role deliberately does not have.
+# @dev It uses the same explicit-shadow diff as CI (scripts/db/schema-diff.sh).
 #
 # Usage: ./scripts/db/db.sh <command> [args]
 #
@@ -23,16 +27,16 @@ Usage: ./scripts/db/db.sh <command>
 
 Setup
   install          npm ci in lib/db, then generate the Prisma client
-  generate         Regenerate the Prisma client (run after editing schema.prisma)
+  generate         Regenerate the Prisma client (run after editing schema.db)
 
 Schema
-  validate         Check schema.prisma without touching a database
-  migrate          Create + apply a migration from schema.prisma (LOCAL ONLY)
+  validate         Check schema.db without touching a database
+  migrate <name>   Create + apply a migration from schema.db (LOCAL ONLY)
   deploy           Apply pending migrations (use this for staging/main)
   status           Show which migrations have been applied
   reset            Drop the schema and re-apply every migration (DESTRUCTIVE)
   drift            Fail if the schema and the migrations disagree
-  format           Format schema.prisma
+  format           Format schema.db
 
 Data
   seed             Insert demo users/products (refuses a production database)
@@ -40,13 +44,22 @@ Data
 
 Local database
   testdb           Create a throwaway database, migrate it, and print its URL
-  up / down        Start / stop the project's Postgres via docker compose
+  up / down        Start / stop the project's MariaDB via docker compose
 EOF
 }
 
 # Run prisma from lib/db with the repository env loaded.
+# The schema lives at schema/schema.db (not Prisma's default prisma/schema.prisma),
+# so every invocation passes an explicit --schema.
+SCHEMA_FILE="$DB_DIR/schema/schema.db"
+MIGRATIONS_DIR="$DB_DIR/schema/migrations"
+
+schema_diff() {
+  "$ROOT/scripts/db/schema-diff.sh" "$@"
+}
+
 prisma() {
-  ( cd "$DB_DIR" && npx --no-install prisma "$@" )
+  ( cd "$DB_DIR" && npx --no-install prisma "$@" --schema "$SCHEMA_FILE" )
 }
 
 # Prisma resolves the datasource block before it decides what the command
@@ -54,8 +67,8 @@ prisma() {
 # DATABASE_URL is absent. Hand it a syntactically valid placeholder: it is
 # never used to reach a database.
 prisma_static() {
-  ( cd "$DB_DIR" && DATABASE_URL="${DATABASE_URL:-postgresql://x:x@localhost:5432/x}" \
-      npx --no-install prisma "$@" )
+  ( cd "$DB_DIR" && DATABASE_URL="${DATABASE_URL:-mysql://x:x@localhost:3306/x}" \
+      npx --no-install prisma "$@" --schema "$SCHEMA_FILE" )
 }
 
 require_installed() {
@@ -84,23 +97,39 @@ cmd_generate() {
 
 cmd_validate() {
   require_installed
-  log "Validating schema.prisma"
+  log "Validating schema.db"
   prisma_static validate
 }
 
 cmd_format() {
   require_installed
-  log "Formatting schema.prisma"
+  log "Formatting schema.db"
   prisma_static format
 }
 
 cmd_migrate() {
   require_installed
   require_db_url
-  warn "migrate dev may RESET the database if it decides the schema drifted."
+  local name="${1:-}"
+  [ -n "$name" ] || die "usage: $0 migrate <name>   (e.g. $0 migrate add_promo_codes)"
+  warn "This applies migrations to the database in DATABASE_URL."
   warn "Use '$0 deploy' for staging or main."
-  log "Creating and applying a migration (local)"
-  prisma migrate dev
+  # Not `prisma migrate dev`: on MariaDB it creates and drops its own shadow
+  # database (`prisma_migrate_shadow_db_<hash>`), which needs a global CREATE
+  # privilege the application role deliberately does not have (it is also a
+  # licence to drop kosply_main). The explicit-shadow workflow below is the same
+  # one CI runs, against the kosply_shadow database init.sh provisions.
+  local sql dir
+  sql="$(schema_diff script)" || die "could not diff the migrations against schema.db"
+  [ -n "$sql" ] || die "schema.db already matches the migrations: nothing to migrate"
+  dir="$MIGRATIONS_DIR/$(date -u +%Y%m%d%H%M%S)_$name"
+  mkdir -p "$dir"
+  printf '%s\n' "$sql" > "$dir/migration.sql"
+  ok "created $(basename "$dir")"
+  log "Applying it"
+  prisma migrate deploy
+  # `migrate deploy` does not regenerate the client, and `migrate dev` used to.
+  cmd_generate
 }
 
 cmd_deploy() {
@@ -110,13 +139,11 @@ cmd_deploy() {
   prisma migrate deploy
   # The CHECK constraints live outside the migrations because they need the
   # tables to exist first; checks.sql is written to be idempotent.
-  if command -v psql >/dev/null 2>&1; then
-    log "Applying data-integrity constraints"
-    psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 -f "$DB_DIR/docker/checks.sql" \
-      || warn "checks.sql did not apply (psql missing, or the DSN is not understood)"
-  else
-    note "psql not installed; skipping checks.sql"
-  fi
+  # `prisma db execute` reads DATABASE_URL itself, so this works with a MariaDB
+  # URL without needing a mysql/psql client on the host.
+  log "Applying data-integrity constraints"
+  prisma db execute --file "$DB_DIR/docker/checks.sql" \
+    || warn "checks.sql did not apply (the DSN is not understood?)"
   ok "database is up to date"
 }
 
@@ -143,19 +170,14 @@ cmd_reset() {
 cmd_drift() {
   require_installed
   require_db_url
-  # CI runs exactly this: a migration that does not reproduce the schema is a
-  # latent P2022 ("column does not exist") the first time it runs.
-  local shadow="${SHADOW_DATABASE_URL:-}"
-  [ -n "$shadow" ] || die "set SHADOW_DATABASE_URL to an empty database for the diff"
-  log "Checking for drift between the migrations and schema.prisma"
-  if prisma migrate diff \
-        --from-migrations prisma/migrations \
-        --to-schema-datamodel prisma/schema.prisma \
-        --shadow-database-url "$shadow" \
-        --exit-code; then
+  # CI runs exactly this (scripts/db/schema-diff.sh check): a migration that
+  # does not reproduce the schema is a latent P2022 ("column does not exist")
+  # the first time it runs.
+  log "Checking for drift between the migrations and schema.db"
+  if schema_diff check; then
     ok "no drift"
   else
-    die "drift detected: the migrations do not produce schema.prisma"
+    die "drift detected: the migrations do not produce schema.db"
   fi
 }
 
@@ -163,7 +185,7 @@ cmd_seed() {
   require_installed
   require_db_url
   log "Seeding demo data"
-  ( cd "$DB_DIR" && node prisma/seed.js )
+  ( cd "$DB_DIR" && node schema/seed.js )
   ok "seeded"
 }
 
@@ -175,16 +197,17 @@ cmd_studio() {
 }
 
 cmd_testdb() {
-  require_cmd docker psql
+  require_cmd docker
   require_installed
   local name="${1:-kosply_scratch}"
-  local url="postgresql://kosply:kosply@localhost:55450/${name}?schema=public"
+  local url="mysql://kosply:kosply@localhost:3306/${name}"
   log "Creating scratch database '$name' and migrating it"
   if ! docker ps >/dev/null 2>&1; then
     die "docker is not running"
   fi
-  docker exec kosply-fix psql -U kosply -d postgres -c "DROP DATABASE IF EXISTS \"$name\"" >/dev/null 2>&1 || true
-  docker exec kosply-fix psql -U kosply -d postgres -c "CREATE DATABASE \"$name\"" >/dev/null
+  local root_pw="${MARIADB_ROOT_PASSWORD:-}"
+  docker exec kosply-mariadb mariadb -uroot ${root_pw:+-p"$root_pw"} -e "DROP DATABASE IF EXISTS \`$name\`" >/dev/null 2>&1 || true
+  docker exec kosply-mariadb mariadb -uroot ${root_pw:+-p"$root_pw"} -e "CREATE DATABASE \`$name\`" >/dev/null
   DATABASE_URL="$url" prisma migrate deploy
   ok "scratch database ready"
   echo
@@ -194,9 +217,9 @@ cmd_testdb() {
 
 cmd_up() {
   require_cmd docker
-  log "Starting Postgres via docker compose"
-  docker compose up -d postgres
-  wait_for_port localhost 5432 Postgres 60 || true
+  log "Starting MariaDB via docker compose"
+  docker compose up -d mariadb
+  wait_for_port localhost 3306 MariaDB 60 || true
 }
 
 cmd_down() {

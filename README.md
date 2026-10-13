@@ -22,13 +22,13 @@ Server: `helmet`, `cors`, `compression`, `morgan`, `dotenv`, `jsonwebtoken`,
 ```
 Kosply-backend/
   ecosystem.config.js       # PM2: kosply-server-staging + kosply-server-main
-  docker-compose.yml        # Postgres + agent (+ one-shot agent migration)
+  docker-compose.yml        # MariaDB + agent (+ one-shot agent migration)
   package.json
   .env.example
   scripts/                  # workflow helpers, see scripts/README.md
-    dev.sh                  # local stack: Postgres + server + agent, one ctrl-c
+    dev.sh                  # local stack: MariaDB + server + agent, one ctrl-c
     server.sh               # server: `dev` foreground, staging/main via PM2
-    db/db.sh                # Prisma + Postgres workflows
+    db/db.sh                # Prisma + MariaDB workflows
     agent/agent.sh          # venv, run and test the Python agent
     postman/validate.sh     # catalog-vs-routes drift check (runs in CI)
     _common.sh              # shared helpers (env loading, readiness probes)
@@ -51,9 +51,9 @@ Kosply-backend/
       agent_spec/tables/    # per-subsystem design notes
       tests/
     db/                     # schema + migrations are the source of truth
-      prisma/schema.prisma
-      prisma/migrations/
-      prisma/seed.js
+      schema/schema.db
+      schema/migrations/
+      schema/seed.js
       docker/init.sh|.sql   # cluster bootstrap
       docker/checks.sql     # data-integrity constraints (post-migrate)
       src/selects.js        # shared read shapes
@@ -70,7 +70,7 @@ the database — that rule is what makes the split possible.
 ```bash
 cp .env.example .env      # then fill in DATABASE_URL, JWT_SECRET, INTERNAL_API_KEY
 ./scripts/dev.sh setup    # install db + root + agent, apply migrations
-./scripts/dev.sh start    # Postgres + server :3000 + agent :8000
+./scripts/dev.sh start    # MariaDB + server :3000 + agent :8000
 ./scripts/dev.sh logs
 ./scripts/dev.sh stop
 ```
@@ -85,14 +85,14 @@ To run just the server in the foreground (no PM2, no Go toolchain):
 ```
 
 See `scripts/README.md` for every command and for why the startup order is
-Postgres → migrations → server → agent.
+MariaDB → migrations → server → agent.
 
 ## Testing
 
 ```bash
 npm test                      # server + db (needs DATABASE_URL)
 ./scripts/agent/agent.sh test # agent (pytest)
-./scripts/db/db.sh drift      # migrations must reproduce schema.prisma
+./scripts/db/db.sh drift      # migrations must reproduce schema.db
 ./scripts/postman/validate.sh # the Postman catalog still matches the routes
 ```
 
@@ -101,7 +101,7 @@ process and would otherwise trip its own throttling.
 `tests/shared/rate_limit.test.js` re-enables it and asserts the real behaviour.
 
 CI additionally runs the agent suite, `prisma migrate deploy` against a real
-Postgres, the drift gate, and a check that the Postman catalog still matches the
+MariaDB, the drift gate, and a check that the Postman catalog still matches the
 routes. That last one exists because the catalog is maintained by hand in two
 formats, and it had silently fallen behind — a new route with no catalog entry
 now fails the build.
@@ -118,7 +118,7 @@ now fails the build.
 | `TRUST_PROXY_HOPS` | no | `0` by default. Must be set behind a load balancer |
 | `CORS_ORIGIN` | no | comma list; `*` unless you set a real origin |
 | `AI_AGENT_URL` | no | default `http://localhost:8000` |
-| `POSTGRES_*`, `AGENT_DB_PASSWORD` | docker | cluster bootstrap; `AGENT_DB_PASSWORD` must match the agent's `DATABASE_URL` |
+| `MARIADB_*`, `AGENT_DB_PASSWORD` | docker | cluster bootstrap; `AGENT_DB_PASSWORD` must match the agent's `DATABASE_URL` |
 
 The agent has its own set (`AI_MODEL`, `AI_MODEL_TIMEOUT_S`, `OPENAI_API_KEY`,
 `KOSPLY_SERVER_URL`, …) — see `lib/agent/.env.example`.
@@ -193,7 +193,7 @@ writing *why*, not *what*.
 - `kosply-server-staging` — `fork`, 1 instance, `:3001`. Test freely here.
 - `kosply-server-main` — `cluster`, up to 4 instances, `:3000`. Real users.
 - Instance count and pool size are derived from `DB_CONNECTION_LIMIT` so the
-  workers fit inside Postgres' per-database ceiling.
+  workers fit inside `DB_CONNECTION_LIMIT`.
 - `server.js` handles `SIGTERM`/`SIGINT` plus `unhandledRejection` and
   `uncaughtException` with a graceful shutdown, safe for `pm2 restart`.
 - Safe flow: change code → `./scripts/server.sh staging restart` → test `:3001`

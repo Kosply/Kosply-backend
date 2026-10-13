@@ -5,9 +5,9 @@ Workflow helpers for the three deployables. Each script has a `--help`.
 ```
 scripts/
   _common.sh        shared helpers (colours, .env loading, readiness probes)
-  dev.sh            local stack: Postgres + server + agent, one ctrl-c
+  dev.sh            local stack: MariaDB + server + agent, one ctrl-c
   server.sh         the server: `dev` for foreground, staging/main via PM2
-  db/db.sh          Prisma + Postgres workflows
+  db/db.sh          Prisma + MariaDB workflows
   agent/agent.sh    venv, run and test the Python agent
   postman/
     validate.sh     assert the API catalog still matches the routes
@@ -41,10 +41,10 @@ otherwise start the service with an empty configuration and no obvious error.
 
 ## Why the startup order is fixed
 
-`dev.sh` starts Postgres, then the server, then the agent, and each step waits
+`dev.sh` starts MariaDB, then the server, then the agent, and each step waits
 for readiness instead of sleeping a fixed amount:
 
-1. **Postgres first.** Everything else queries it on boot.
+1. **MariaDB first.** Everything else queries it on boot.
 2. **Migrations before the server.** New code against an old schema fails as
    `column does not exist` (P2022) on live traffic.
 3. **The agent last.** Its tools call the server's `/api/internal/*` API, which
@@ -58,20 +58,28 @@ for readiness instead of sleeping a fixed amount:
 ```bash
 ./scripts/db/db.sh install     # npm ci + prisma generate
 ./scripts/db/db.sh validate    # static check; no database needed
-./scripts/db/db.sh migrate     # create a migration (LOCAL only)
+./scripts/db/db.sh migrate <name>  # create + apply a migration (LOCAL only)
 ./scripts/db/db.sh deploy      # apply pending migrations (staging/main)
-./scripts/db/db.sh drift       # fail if migrations != schema.prisma
+./scripts/db/db.sh drift       # fail if migrations != schema.db
 ./scripts/db/db.sh seed        # demo data; refuses a production database
 ./scripts/db/db.sh studio      # Prisma Studio
 ./scripts/db/db.sh reset       # DESTRUCTIVE; asks you to type the db name
 ./scripts/db/db.sh testdb      # throwaway migrated database, prints its URL
 ```
 
-Use `deploy`, never `migrate`, against staging or main: `migrate dev` can decide
-the schema drifted and **reset the database**.
+Use `deploy`, never `migrate`, against staging or main: creating a migration can
+decide the schema drifted and **reset the database**.
 
-`drift` is the check CI runs. It needs `SHADOW_DATABASE_URL` pointing at an
-empty database.
+`migrate <name>` deliberately does not shell out to `prisma migrate dev`: on
+MariaDB that command creates and drops its own shadow database
+(`prisma_migrate_shadow_db_<hash>`), which needs a global `CREATE` privilege.
+Granting the application role that is a licence to drop `kosply_main` too, so
+`docker/init.sh` provisions a dedicated `kosply_shadow` database instead and the
+diff runs through `scripts/db/schema-diff.sh` — the same helper CI uses.
+
+`drift` is that helper in `check` mode. It uses `SHADOW_DATABASE_URL` when set
+and otherwise falls back to `kosply_shadow` on the server `DATABASE_URL` points
+at.
 
 ### `scripts/agent/agent.sh`
 

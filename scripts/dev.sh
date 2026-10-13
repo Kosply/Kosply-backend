@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # @title Kosply local development stack
-# @notice Boots Postgres, the Express server and the AI agent together, with
+# @notice Boots MariaDB, the Express server and the AI agent together, with
 # @notice prefixed logs and a single ctrl-c that stops all of them.
 # @dev The ordering matters and is the whole point of this script:
-# @dev   1. Postgres must accept connections before anything queries it.
+# @dev   1. MariaDB must accept connections before anything queries it.
 # @dev   2. The agent's tools call the server's `/api/internal/*` API, and the
 # @dev      server 401s them without INTERNAL_API_KEY, so the server has to be
 # @dev      up before the agent is useful -- but the agent boots fine without it.
@@ -29,7 +29,7 @@ usage() {
 Usage: ./scripts/dev.sh [command]
 
   setup     Install every dependency (db, root, agent) and apply migrations
-  start     Start Postgres + server + agent in the background   (default)
+  start     Start MariaDB + server + agent in the background  (default)
   stop      Stop the server and the agent
   restart   Stop, then start
   status    Show what is running
@@ -63,14 +63,14 @@ cmd_setup() {
 }
 
 wait_for_db() {
-  # Postgres may already be running from a previous session or compose.
-  if wait_for_port localhost 5432 Postgres 3; then
+  # MariaDB may already be running from a previous session or compose.
+  if wait_for_port localhost 3306 MariaDB 3; then
     return 0
   fi
   require_cmd docker
-  log "Starting Postgres"
-  ( cd "$ROOT" && docker compose up -d postgres )
-  wait_for_port localhost 5432 Postgres 60 || die "Postgres did not start"
+  log "Starting MariaDB"
+  ( cd "$ROOT" && docker compose up -d mariadb )
+  wait_for_port localhost 3306 MariaDB 60 || die "MariaDB did not start"
 }
 
 cmd_start() {
@@ -121,7 +121,7 @@ cmd_stop() {
     fi
     rm -f "$RUN_DIR/$name.pid"
   done
-  note "Postgres left running on purpose; use: docker compose down"
+  note "MariaDB left running on purpose; use: docker compose down"
 }
 
 cmd_status() {
@@ -131,10 +131,10 @@ cmd_status() {
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then state="running (pid $pid)"; else state="stopped"; fi
     printf '  %-8s %s\n' "$name" "$state"
   done
-  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q kosply-postgres; then
-    printf '  %-8s %s\n' "postgres" "running (docker)"
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -q kosply-mariadb; then
+    printf '  %-8s %s\n' "mariadb" "running (docker)"
   else
-    printf '  %-8s %s\n' "postgres" "stopped"
+    printf '  %-8s %s\n' "mariadb" "stopped"
   fi
 }
 

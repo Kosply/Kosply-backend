@@ -1,18 +1,25 @@
 """Shared history storage: mirror turns into `ai_conversations`/`ai_messages`.
 
-Same Postgres, same tables Prisma maps (see `lib/db`). The LangGraph
+Same MariaDB, same tables Prisma maps (see `lib/db`). The LangGraph
 checkpointer keeps the runnable state; these tables keep the app-level
 history the server/Flutter read. `thread_id == ai_conversations.id`.
 
 Best-effort by design: without `DATABASE_URL` (or when the mirror fails,
 e.g. the user row doesn't exist yet) the turn is skipped with a warning —
 chat itself never breaks.
+
+SQL dialect notes (migrated from PostgreSQL):
+- identifiers are backtick-quoted (MySQL treats `"x"` as a string literal);
+- `ON CONFLICT ... DO NOTHING` -> `INSERT IGNORE` (needs the PK/unique on id,
+  which the schema has);
+- no `::"AiMessageRole"` cast: the column is a native MySQL ENUM and accepts
+  the role string directly.
 """
 
 import logging
 import uuid
 
-from app.core.config import settings
+from app.core.config import mysql_conn_kwargs, settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +38,9 @@ def _new_id() -> str:
 
 async def _connect():
     """Open a short-lived async connection (basic: one per call)."""
-    from psycopg import AsyncConnection
+    import aiomysql
 
-    from app.core.config import pg_dsn
-
-    return await AsyncConnection.connect(pg_dsn(settings.database_url))
+    return await aiomysql.connect(**mysql_conn_kwargs(settings.database_url))
 
 
 async def ensure_conversation(conversation_id: str, user_id: str, title: str) -> None:
@@ -44,15 +49,22 @@ async def ensure_conversation(conversation_id: str, user_id: str, title: str) ->
         return
     conn = await _connect()
     try:
-        async with conn.transaction():
-            await conn.execute(
-                'INSERT INTO "ai_conversations" ("id", "userId", "title", "createdAt", "updatedAt")'
-                " VALUES (%s, %s, %s, NOW(), NOW())"
-                ' ON CONFLICT ("id") DO NOTHING',
-                (conversation_id, user_id, title[:120]),
-            )
+        # aiomysql connections default to autocommit=False: manage it here.
+        await conn.begin()
+        try:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    'INSERT IGNORE INTO `ai_conversations`'
+                    ' (`id`, `userId`, `title`, `createdAt`, `updatedAt`)'
+                    " VALUES (%s, %s, %s, NOW(), NOW())",
+                    (conversation_id, user_id, title[:120]),
+                )
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
     finally:
-        await conn.close()
+        conn.close()
 
 
 async def append_message(
@@ -66,19 +78,26 @@ async def append_message(
         return
     conn = await _connect()
     try:
-        async with conn.transaction():
-            await conn.execute(
-                'INSERT INTO "ai_messages" ("id", "conversationId", "role", "content", "model", "createdAt")'
-                ' VALUES (%s, %s, %s::"AiMessageRole", %s, %s, NOW())',
-                (_new_id(), conversation_id, db_role, content, model),
-            )
-            await conn.execute(
-                'UPDATE "ai_conversations" SET "lastMessageAt" = NOW(), "updatedAt" = NOW()'
-                ' WHERE "id" = %s',
-                (conversation_id,),
-            )
+        await conn.begin()
+        try:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    'INSERT INTO `ai_messages`'
+                    ' (`id`, `conversationId`, `role`, `content`, `model`, `createdAt`)'
+                    ' VALUES (%s, %s, %s, %s, %s, NOW())',
+                    (_new_id(), conversation_id, db_role, content, model),
+                )
+                await cur.execute(
+                    'UPDATE `ai_conversations` SET `lastMessageAt` = NOW(), `updatedAt` = NOW()'
+                    ' WHERE `id` = %s',
+                    (conversation_id,),
+                )
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
     finally:
-        await conn.close()
+        conn.close()
 
 
 async def load_history(conversation_id: str) -> list:
@@ -88,14 +107,15 @@ async def load_history(conversation_id: str) -> list:
     back = {"USER": "human", "ASSISTANT": "ai", "SYSTEM": "system"}
     conn = await _connect()
     try:
-        cur = await conn.execute(
-            'SELECT "role", "content" FROM "ai_messages"'
-            ' WHERE "conversationId" = %s ORDER BY "createdAt" ASC',
-            (conversation_id,),
-        )
-        rows = await cur.fetchall()
+        async with conn.cursor() as cur:
+            await cur.execute(
+                'SELECT `role`, `content` FROM `ai_messages`'
+                ' WHERE `conversationId` = %s ORDER BY `createdAt` ASC',
+                (conversation_id,),
+            )
+            rows = await cur.fetchall()
     finally:
-        await conn.close()
+        conn.close()
     return [{"role": back.get(r[0], "unknown"), "content": r[1]} for r in rows]
 
 

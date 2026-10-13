@@ -1,9 +1,11 @@
 /**
  * @title Kosply database schema
- * @notice Single source of truth for Postgres tables.
+ * @notice Single source of truth for MariaDB tables.
  * @dev Student second-hand marketplace. Category is still String? (blank)
  * @dev for now, later a FK to a Category model. KTM images are never public,
  * @dev only admins read them for seller verification.
+ * @dev Migrated from Postgres: scalar lists (String[]) are not supported on
+ * @dev MySQL/MariaDB, so imageUrls/evidenceUrls are Json (JSON arrays).
  */
 
 generator client {
@@ -11,7 +13,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -106,33 +108,33 @@ enum ReportAction {
 
 /// @notice Base account. Buyer vs seller is distinguished by the SellerVerification relation + role field.
 model User {
-  id                    String               @id @default(cuid())
-  email                 String               @unique
-  username              String               @unique
-  name                  String
-  passwordHash       String
-  googleId           String?            @unique /// Google sub (direct auth link)
-  appleId            String?            @unique /// Apple sub (direct auth link)
-  universitas           String
-  programStudi          String
-  bio                   String?              @db.Text /// seller storefront bio, shown on the seller profile
-  photo                 String? /// avatar URL (client uploads elsewhere, stores the URL here)
-  isActive              Boolean              @default(true) /// false = login blocked (frozen by super admin)
-  role                  UserRole             @default(BUYER)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  sellerVerification    SellerVerification?
-  products              Product[]            @relation("SellerProducts")
-  buyerConversations    Conversation[]       @relation("BuyerConversations")
-  sellerConversations   Conversation[]       @relation("SellerConversations")
-  sentMessages          Message[]            @relation("SentMessages")
-  supportTickets        SupportTicket[]
-  supportMessagesSent   SupportMessage[]     @relation("SupportMessagesSent")
-  reportsMade           Report[]             @relation("ReportsMade")
-  reportsReceived       Report[]             @relation("ReportsReceived")
-  passwordResets        PasswordReset[]
-  aiConversations       AiConversation[]
-  notifications         Notification[]
+  id                      String                   @id @default(cuid())
+  email                   String                   @unique
+  username                String                   @unique
+  name                    String
+  passwordHash            String
+  googleId                String?                  @unique /// Google sub (direct auth link)
+  appleId                 String?                  @unique /// Apple sub (direct auth link)
+  universitas             String
+  programStudi            String
+  bio                     String?                  @db.Text /// seller storefront bio, shown on the seller profile
+  photo                   String? /// avatar URL (client uploads elsewhere, stores the URL here)
+  isActive                Boolean                  @default(true) /// false = login blocked (frozen by super admin)
+  role                    UserRole                 @default(BUYER)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  sellerVerification      SellerVerification?
+  products                Product[]                @relation("SellerProducts")
+  buyerConversations      Conversation[]           @relation("BuyerConversations")
+  sellerConversations     Conversation[]           @relation("SellerConversations")
+  sentMessages            Message[]                @relation("SentMessages")
+  supportTickets          SupportTicket[]
+  supportMessagesSent     SupportMessage[]         @relation("SupportMessagesSent")
+  reportsMade             Report[]                 @relation("ReportsMade")
+  reportsReceived         Report[]                 @relation("ReportsReceived")
+  passwordResets          PasswordReset[]
+  aiConversations         AiConversation[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
 
   @@map("users")
@@ -176,7 +178,7 @@ model Product {
   description   String         @db.Text
   price         Int /// rupiah, >= 0 (validated in service/zod later)
   stock         Int            @default(1) /// quantities / stock
-  imageUrls     String[]       @default([]) /// Image: 1..N URL, cover = imageUrls[0]
+  imageUrls     Json           @default("[]") /// JSON array of image URLs, cover = imageUrls[0]
   category      String? /// TODO: become a Category FK — blank for now
   latitude      Float? /// item location, set when creating the catalog
   longitude     Float?
@@ -327,7 +329,7 @@ model Report {
   reportedProduct   Product?       @relation(fields: [reportedProductId], references: [id], onDelete: SetNull)
   category          ReportCategory @default(LAINNYA)
   description       String         @db.Text /// report detail from the UI
-  evidenceUrls      String[]       @default([]) /// screenshots / chat evidence, optional
+  evidenceUrls      Json           @default("[]") /// JSON array of screenshots / chat evidence, optional
   status            ReportStatus   @default(PENDING)
   action            ReportAction   @default(NONE) /// WARNING | DELETE_PRODUCT | BAN_USER (executed in service/admin)
   actionNote        String? /// admin action reason
@@ -380,16 +382,16 @@ model PasswordReset {
 /// @dev Rows are created by services on key events (chat, verification,
 /// @dev reports, support) only when the matching preference is enabled.
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String /// event group: chat | verification | reports | support | product | system
   title     String
-  body      String   @db.Text
+  body      String    @db.Text
   data      Json? /// deep-link payload, e.g. { conversationId, productId }
-  isRead    Boolean  @default(false)
+  isRead    Boolean   @default(false)
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@map("notifications")

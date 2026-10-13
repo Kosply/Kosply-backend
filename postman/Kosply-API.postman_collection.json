@@ -2,7 +2,7 @@
  "info": {
   "_postman_id": "b3a1c7e2-4f6d-4a8b-9c0d-kosply000001",
   "name": "Kosply API",
-  "description": "Kosply backend — marketplace second-hand mahasiswa. Run against http://localhost:3000 (npm start) with Postgres up + seeded (`npm run seed` in lib/db). Flow: Auth/Register (or Login) first — the token is captured automatically.",
+  "description": "Kosply backend — marketplace second-hand mahasiswa. Run against http://localhost:3000 (npm start) with MariaDB up + seeded (`npm run seed` in lib/db). Flow: Auth/Register (or Login) first — the token is captured automatically.",
   "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
  },
  "auth": {

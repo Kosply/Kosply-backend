@@ -96,7 +96,7 @@ class RoutesRequireKeyTest(unittest.IsolatedAsyncioTestCase):
 
 
 class BoundedIdentifierTest(unittest.IsolatedAsyncioTestCase):
-    """Unbounded ids became Postgres primary keys and URL path segments."""
+    """Unbounded ids became SQL primary keys and URL path segments."""
 
     HOSTILE_BODIES = [
         {"conversation_id": "c" * 5000, "user_id": "u1", "message": "hi"},
@@ -243,10 +243,10 @@ class _FakeConn:
 class _FakePool:
     """Pool stub exposing the SAME surface the production code calls.
 
-    `AsyncConnectionPool` has no `acquire()`; the production code originally
-    called it, the AttributeError was swallowed, and the ownership check never
-    ran. A stub with only `connection()` reproduces that trap, so this test
-    fails if the wrong method is used again.
+    aiomysql's `Pool` exposes `acquire()` (async context manager) and has no
+    `connection()`; the psycopg pool was the opposite. A stub with only
+    `acquire()` reproduces the trap, so this test fails if the wrong method
+    is used again.
     """
 
     def __init__(self, row, raise_on_use=None):
@@ -254,13 +254,13 @@ class _FakePool:
         self._raise = raise_on_use
         self.calls = 0
 
-    def connection(self):
+    def acquire(self):
         self.calls += 1
         if self._raise is not None:
             raise self._raise
         return _FakeConn(self._row)
 
-    async def aclose(self):
+    def close(self):
         return None
 
 
@@ -318,12 +318,12 @@ class ThreadOwnershipTest(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_the_pool_method_actually_exists(self):
-        """Guards the regression directly: `acquire()` does not exist on the pool."""
-        from psycopg_pool import AsyncConnectionPool
+        """Guards the regression directly: `connection()` does not exist on the pool."""
+        from aiomysql import Pool
 
-        self.assertTrue(hasattr(AsyncConnectionPool, "connection"))
+        self.assertTrue(hasattr(Pool, "acquire"))
         self.assertFalse(
-            hasattr(AsyncConnectionPool, "acquire"),
+            hasattr(Pool, "connection"),
             "if this ever becomes true the stub in this file is no longer faithful",
         )
 

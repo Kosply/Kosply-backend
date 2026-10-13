@@ -32,7 +32,7 @@ so every turn is persisted and resumable.
 | `init_chat_model` | `langchain.chat_models` | provider-agnostic model (`AI_MODEL`) |
 | `ToolMessage`, `HumanMessage` | `langchain_core.messages` | tool results / user turns |
 | `tool` | `langchain_core.tools` | tool decorator |
-| `PostgresSaver` / `AsyncPostgresSaver` | `langgraph.checkpoint.postgres(.aio)` | persistence (see `memory.md`) |
+| `InMemorySaver` / `AIOMySQLSaver` | `langgraph.checkpoint.memory` / `langgraph.checkpoint.mysql.aio` | persistence (see `memory.md`) |
 | `InMemorySaver` | `langgraph.checkpoint.memory` | dev fallback, also used by tests |
 
 ## State

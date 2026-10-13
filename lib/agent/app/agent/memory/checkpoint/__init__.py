@@ -1,4 +1,4 @@
-"""Checkpointer package: Postgres persistence with in-memory fallback."""
+"""Checkpointer package: MySQL/MariaDB persistence with in-memory fallback."""
 
 from .checkpointer import CloseSaver, create_saver, describe_saver
 

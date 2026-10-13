@@ -1,5 +1,5 @@
 # Kosply CI: Express server + database + kosmon CLI + helper scripts.
-# The database job is not optional: without a live Postgres every DB-backed test
+# The database job is not optional: without a live MariaDB every DB-backed test
 # skips, `node --test` reports a skip as a pass, and the whole data layer ships
 # unverified. That gap hid the auth, ownership and moderation defects fixed in
 # the 2026-09 security pass.
@@ -30,16 +30,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      postgres:
-        image: postgres:16-alpine
+      mariadb:
+        image: mariadb:11.4
         env:
-          POSTGRES_USER: kosply
-          POSTGRES_PASSWORD: kosply
-          POSTGRES_DB: kosply_test
+          MARIADB_ROOT_PASSWORD: kosply
+          MARIADB_USER: kosply
+          MARIADB_PASSWORD: kosply
+          MARIADB_DATABASE: kosply_test
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd "pg_isready -U kosply"
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -61,40 +62,49 @@ jobs:
 
       - name: Generate the Prisma client
         working-directory: lib/db
-        run: npx prisma generate
+        run: npx prisma generate --schema schema/schema.db
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
 
       - name: Apply migrations (the deploy path does this too)
         working-directory: lib/db
-        run: npx prisma migrate deploy
+        run: npx prisma migrate deploy --schema schema/schema.db
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
 
+      # MariaDB grants MARIADB_USER only on MARIADB_DATABASE, so the shadow
+      # database cannot be created as kosply the way it could as a PostgreSQL
+      # superuser. Create it as root and hand it to the application role, which
+      # is what lib/db/docker/init.sh does locally. The root URL points at
+      # kosply_test rather than `mysql` because `prisma db execute` refuses to
+      # run against a system database.
       - name: Create the shadow database used by the drift check
         working-directory: lib/db
         run: |
-          echo 'CREATE DATABASE kosply_shadow;' > /tmp/shadow.sql
-          npx prisma db execute --file /tmp/shadow.sql --schema prisma/schema.prisma
+          cat > /tmp/shadow.sql <<'SQL'
+          CREATE DATABASE IF NOT EXISTS kosply_shadow;
+          GRANT ALL PRIVILEGES ON kosply_shadow.* TO 'kosply'@'%';
+          SQL
+          npx prisma db execute --file /tmp/shadow.sql --schema schema/schema.db
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://root:kosply@localhost:3306/kosply_test
 
+      # Deliberately the same helper `./scripts/db/db.sh drift` and
+      # `db.sh migrate <name>` use, rather than a copy of the command: the two
+      # answers cannot drift apart. The helper also normalises the datamodel's
+      # Json scalars, because MariaDB has no JSON type (it stores JSON as
+      # LONGTEXT, which is what Prisma introspects).
       - name: Assert the schema matches the migration history (no drift)
-        working-directory: lib/db
-        run: |
-          npx prisma migrate diff \
-            --from-migrations prisma/migrations \
-            --to-schema-datamodel prisma/schema.prisma \
-            --shadow-database-url "postgresql://kosply:kosply@localhost:5432/kosply_shadow?schema=public" \
-            --exit-code
+        run: ./scripts/db/schema-diff.sh check
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
+          SHADOW_DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_shadow
 
       - name: Seed fixtures
         working-directory: lib/db
-        run: node prisma/seed.js
+        run: node schema/seed.js
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
           NODE_ENV: test
 
       # A hand-maintained list of files rots silently: the next file added is
@@ -118,7 +128,7 @@ jobs:
       - name: Unit + integration tests (node:test, with a real database)
         run: npm test
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
 
       # These two cases assert the *degraded* path (no DB configured), so they
       # only run when DATABASE_URL is unset. With it set workflow-wide they
@@ -139,7 +149,7 @@ jobs:
 
       - name: Smoke test (boot + health + a database-backed route)
         env:
-          DATABASE_URL: postgresql://kosply:kosply@localhost:5432/kosply_test?schema=public
+          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
         run: |
           set -uo pipefail
           PORT=3100 node lib/server/server.js > /tmp/kosply-smoke.log 2>&1 &

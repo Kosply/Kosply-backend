@@ -12,7 +12,7 @@ then fairness).
 | In-flight cap | `caps.run_guarded` / `stream_guarded` | semaphore (`AI_MAX_INFLIGHT`, default 50); no slot within `AI_QUEUE_TIMEOUT_S` (default 5s) → `503 {code via ServerBusy}` |
 | Waiter cap | `/ai/wait/:id` (`app.state.waiters`) | approval long-polls skip the model semaphore (no LLM call) but stay bounded by `AI_MAX_WAITERS` (default 200); full pool → `503` immediately, never queued |
 | Run timeout | `run_guarded` | model call over `AI_MODEL_TIMEOUT_S` (default 120s) → `504` via `ModelTimeout` |
-| Readiness | `GET /readyz` | postgres: `SELECT 1` ok → `200 ok`, fail → `503 down`; memory saver → `200 degraded` |
+| Readiness | `GET /readyz` | mysql: `SELECT 1` ok → `200 ok`, fail → `503 down`; memory saver → `200 degraded` |
 | Tool failures | `ToolNode(handle_tool_errors=True)` | failing tool becomes an error `ToolMessage` the agent explains, never a crashed turn |
 
 ## Rules

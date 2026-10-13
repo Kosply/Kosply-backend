@@ -1,48 +1,48 @@
 # Kosply local/staging data tier + AI agent.
-# Security posture (fixed in the 2026-09 audit pass):
-#  - Postgres is no longer published on 0.0.0.0 with a committed `kosply:kosply`
-#    credential. The Node server runs under PM2 on the host and connects over
-#    127.0.0.1, so the port is bound to loopback only.
+# Security posture (fixed in the 2026-09 audit pass, kept through the MariaDB
+# migration):
+#  - MariaDB is no longer published on 0.0.0.0 with a committed credential.
+#    The Node server runs under PM2 on the host and connects over 127.0.0.1,
+#    so the port is bound to loopback only.
 #  - Credentials come from the environment (a gitignored `.env`), not literals.
 #  - The agent is reachable only on the compose network; it is not published to
 #    the host, and it now requires INTERNAL_API_KEY on the server side.
-#  - The agent is given a least-privilege role, not the Postgres superuser: it
+#  - The agent is given a least-privilege role, not the database superuser: it
 #    ingests buyer-controlled text into an LLM, so it should not be able to
 #    read or write the production database.
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: kosply-postgres
+  mariadb:
+    image: mariadb:11.4
+    container_name: kosply-mariadb
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-kosply}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-kosply_dev}
-      # Create the staging/main databases and a least-privilege agent role.
-      POSTGRES_MULTIPLE_DATABASES: kosply_staging,kosply_main,kosply_agent
-      # Read by 01-init.sh to create the kosply_agent role's password.
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD in .env}
+      MARIADB_USER: ${MARIADB_USER:-kosply}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?set MARIADB_PASSWORD in .env}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-kosply_dev}
+      # Read by 01-init.sh to create the kosply_agent role's password and to
+      # grant the app role access to the staging/main databases.
       AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:-kosply}
-    # Loopback only. `5432:5432` bound every interface, so anyone who could
-    # route to the host reached the database with a publicly known password.
+    # Loopback only. A published 0.0.0.0 port with a known password is a
+    # reachable database for anyone who can route to the host.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:3306:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      # Only init.sh goes in docker-entrypoint-initdb.d. The postgres image
-      # executes EVERY .sql in that directory itself, with a bare `psql -f` and
-      # no variables, so keeping init.sql there too ran it a second time
-      # without `-v agent_password` and it died on `:'agent_password'`.
+      - mariadata:/var/lib/mysql
+      # Only init.sh goes in docker-entrypoint-initdb.d. It creates the
+      # staging/main/agent databases, grants, and the least-privilege agent
+      # role. Init only runs on an EMPTY data volume: rotating a password on a
+      # live volume needs a manual ALTER USER.
       - ./lib/db/docker/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
-      - ./lib/db/docker/init.sql:/kosply-init/01-init.sql:ro
     networks:
       - data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kosply} -d ${POSTGRES_DB:-kosply_dev}"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 20s
-    # Default `json-file` logging has no size cap; a full disk stops Postgres
+    # Default `json-file` logging has no size cap; a full disk stops MariaDB
     # writing, which is a cascading outage.
     logging:
       driver: json-file
@@ -53,7 +53,7 @@ services:
 
   # One-shot: create the agent database's schema.
   #
-  # `init.sql` creates `kosply_agent` EMPTY (deliberately: the agent gets its
+  # `init.sh` creates `kosply_agent` EMPTY (deliberately: the agent gets its
   # own database and its own least-privilege role, so it cannot read
   # `kosply_main`). But the agent's ownership check queries `ai_conversations`,
   # a Prisma model, so an unmigrated agent database made EVERY /ai/* route
@@ -67,12 +67,17 @@ services:
     volumes:
       - ./lib/db:/db
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kosply}:${AGENT_DB_PASSWORD:-kosply}@postgres:5432/kosply_agent?schema=public
+      # Least-privilege role created by init.sh, not the superuser: it owns
+      # ONLY the kosply_agent database, so a compromised agent cannot read
+      # kosply_main. (The pre-MariaDB compose connected as POSTGRES_USER
+      # instead, which silently made the agent a superuser.)
+      DATABASE_URL: mysql://kosply_agent:${AGENT_DB_PASSWORD:-kosply}@mariadb:3306/kosply_agent
     command: >
       sh -c "npm install --no-audit --no-fund --loglevel=error prisma@6 @prisma/client@6 &&
-             npx prisma generate && npx prisma migrate deploy"
+             npx prisma generate --schema schema/schema.db &&
+             npx prisma migrate deploy --schema schema/schema.db"
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
     networks:
       - data
@@ -84,7 +89,7 @@ services:
     # Loopback only. The agent used to be published on 0.0.0.0:8000 with no
     # authentication, so anyone who could reach the host could spend the LLM
     # key and read any conversation. It is bound to 127.0.0.1 for the same
-    # reason Postgres is: the server runs on the HOST and defaults to
+    # reason the database is: the server runs on the HOST and defaults to
     # `aiAgentUrl: http://localhost:8000`, so with `expose:` only (no reverse
     # proxy in this repo) every /api/ai/* route returned 503 ECONNREFUSED.
     ports:
@@ -94,8 +99,8 @@ services:
     environment:
       PORT: 8000
       NODE_ENV: ${AGENT_NODE_ENV:-development}
-      # Least-privilege role created by init.sql, not the superuser.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kosply}:${AGENT_DB_PASSWORD:-kosply}@postgres:5432/kosply_agent?schema=public
+      # Least-privilege role created by init.sh, not the superuser.
+      DATABASE_URL: mysql://kosply_agent:${AGENT_DB_PASSWORD:-kosply}@mariadb:3306/kosply_agent
       KOSPLY_SERVER_URL: http://host.docker.internal:3000
       # Shared secret the server requires on /api/internal/*.
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
@@ -106,7 +111,7 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
       migrate-agent:
         condition: service_completed_successfully
@@ -117,7 +122,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      # The agent boots LangGraph and a psycopg pool at import; without a
+      # The agent boots LangGraph and an aiomysql pool at import; without a
       # start_period it latches `unhealthy` and `restart: unless-stopped`
       # does not act on `unhealthy`.
       start_period: 60s
@@ -137,4 +142,4 @@ networks:
     driver: bridge
 
 volumes:
-  pgdata:
+  mariadata:

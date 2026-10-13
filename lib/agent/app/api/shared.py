@@ -54,13 +54,14 @@ async def assert_thread_ownership(app, conversation_id: str, user_id: str) -> No
         # without INTERNAL_API_KEY, so this path is not publicly reachable.
         return
     try:
-        # `AsyncConnectionPool` exposes `connection()`; there is no `acquire()`.
-        # The previous code called the missing method, so the AttributeError was
-        # caught by the bare `except` below and the check never ran at all.
-        async with db.connection() as conn:
+        # aiomysql's pool exposes `acquire()` (an async context manager).
+        # The psycopg version exposed `connection()` and no `acquire()`; a
+        # mismatch here raises AttributeError, which is caught by the bare
+        # `except` below and turns into a 503 rather than a silent skip.
+        async with db.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    'SELECT "userId" FROM ai_conversations WHERE id = %s',
+                    'SELECT `userId` FROM ai_conversations WHERE id = %s',
                     (conversation_id,),
                 )
                 row = await cur.fetchone()

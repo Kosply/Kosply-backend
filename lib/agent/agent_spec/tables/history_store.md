@@ -6,7 +6,7 @@ reads from them first.
 
 | Function | Does |
 |---|---|
-| `ensure_conversation(id, user_id, title)` | `INSERT … ON CONFLICT DO NOTHING` into `ai_conversations` (title = first message, truncated) |
+| `ensure_conversation(id, user_id, title)` | `INSERT IGNORE …` into `ai_conversations` (title = first message, truncated) |
 | `append_message(id, role, content, model?)` | one `ai_messages` row + bumps `lastMessageAt`; tool rows skipped |
 | `load_history(id)` | `ai_messages` ordered by `createdAt` → `[{role, content}]` (roles back-mapped to human/ai/system) |
 | `sync_turn(id, user_id, message, answer)` | ensure + user row + assistant row; warns and continues on failure |
@@ -32,7 +32,7 @@ reads from them first.
 
 | Rule | Notes |
 |---|---|
-| Same Postgres, same tables | raw SQL via `psycopg` async; column names quoted (`"userId"`, `"conversationId"`, enum cast `::"AiMessageRole"`) |
+| Same MariaDB, same tables | raw SQL via `aiomysql`; column names backtick-quoted (`` `userId` ``, `` `conversationId` ``); enum column takes the role string directly |
 | Best-effort | off without `DATABASE_URL`; failures (e.g. missing user row for the FK) warn, never break chat |
 | Ids | conversation id comes from the client (`thread_id`); message ids are random hex (TEXT pk accepts non-cuid) |
 | Owner stays server-side | once server internal endpoints exist, it becomes the writer and the agent mirror is dropped (TODO) |
