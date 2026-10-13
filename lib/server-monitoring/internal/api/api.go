@@ -59,6 +59,7 @@ func Registry() []Endpoint {
 		{Method: "GET", Path: "/api/verifications/me", Description: "Own KTM application status (needs JWT)"},
 		{Method: "GET", Path: "/api/verifications", Description: "All applications (needs ADMIN: 403 here)"},
 		{Method: "GET", Path: "/api/reports", Description: "Fraud report queue (needs ADMIN: 403 here)"},
+		{Method: "GET", Path: "/api/tools/stats", Description: "AI tool usage benchmark (needs ADMIN: 403 here)"},
 		{Method: "GET", Path: "/api/support/tickets", Description: "Support tickets (needs ADMIN for all: 403 here)"},
 		{Method: "GET", Path: "/api/support/tickets/:id", Description: "One ticket (needs JWT)"},
 		{Method: "GET", Path: "/api/ai/conversations", Description: "Own AI session list (needs JWT)"},

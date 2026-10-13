@@ -4613,6 +4613,36 @@
      ]
     }
    ]
+  },
+  {
+   "name": "Tools",
+   "item": [
+    {
+     "name": "GET Tool stats (admin)",
+     "request": {
+      "description": "ADMIN only (?days=30, max 90). Usage, success rate and latency per AI tool.",
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{baseUrl}}/api/tools/stats?days=30",
+       "host": [
+        "{{baseUrl}}"
+       ],
+       "path": [
+        "api",
+        "tools",
+        "stats"
+       ],
+       "query": [
+        {
+         "key": "days",
+         "value": "30"
+        }
+       ]
+      }
+     }
+    }
+   ]
   }
  ]
 }

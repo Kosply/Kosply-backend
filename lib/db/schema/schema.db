@@ -463,3 +463,31 @@ model AiModel {
   @@index([isActive])
   @@map("ai_models")
 }
+
+/// @notice Outcome of one AI tool invocation, as seen by the ops dashboard.
+enum ToolInvocationStatus {
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+/// @notice One AI tool invocation (ops benchmark surface).
+/// @dev Append-only: one row per tool call, so `GET /api/tools/stats` can rank
+/// @dev usage per tool and report success rate + average latency. It replaces
+/// @dev the former hardcoded fixture numbers the dashboard benchmark used.
+/// @dev `userId` is plain TEXT with NO FK, matching ProductEvent.viewerId:
+/// @dev deleting a user must not erase the historical counters.
+model ToolInvocation {
+  id        String               @id @default(cuid())
+  tool      String /// tool name, e.g. search_products | compare_items | add_to_cart
+  model     String? /// AiModel.modelId that produced the call (null = unknown/legacy)
+  userId    String? /// caller (no FK on purpose — see the note above)
+  status    ToolInvocationStatus @default(SUCCESS)
+  latencyMs Int? /// wall time of the call in milliseconds
+  createdAt DateTime             @default(now())
+
+  @@index([tool, createdAt])
+  @@index([model, createdAt])
+  @@index([status, createdAt])
+  @@map("tool_invocations")
+}
