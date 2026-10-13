@@ -25,6 +25,12 @@ Kosply-backend/
   docker-compose.yml        # MariaDB + agent (+ one-shot agent migration)
   package.json
   .env.example
+  seed.sh                   # dashboard demo seed — fills a dev db (seed/README.md)
+  seed/                     # fixtures for every dashboard surface
+    accounts.js             #   login-able operator account (placeholders, env-driven)
+    dashboard.js            #   users, products, verifications, reports, tickets, models
+    guard.js                #   refuses production / non-dev databases
+    index.js                #   runner: ./seed.sh [all|accounts|dashboard]
   scripts/                  # workflow helpers, see scripts/README.md
     dev.sh                  # local stack: MariaDB + server + agent, one ctrl-c
     server.sh               # server: `dev` foreground, staging/main via PM2
@@ -67,16 +73,92 @@ the database — that rule is what makes the split possible.
 
 ## Getting started
 
+A complete first run, from an empty machine to a seeded database.
+
+### 0. Prerequisites
+
+- **Docker Desktop** — <https://www.docker.com/products/docker-desktop/> — runs
+  MariaDB (`mariadb:11.4`) and the agent container. Any Docker Engine with
+  Compose v2 works; make sure `docker compose` is on your `PATH`.
+- **Node.js >= 18** — the Express server and the seed scripts.
+- Python is not required for the Docker path (the agent is built as an image);
+  `./scripts/dev.sh setup` additionally creates `lib/agent/.venv` for a native
+  agent run.
+- Local ports used: `3306` (MariaDB, loopback only), `3000` (server), `8000`
+  (agent, loopback only).
+
+### 1. Clone
+
 ```bash
-cp .env.example .env      # then fill in DATABASE_URL, JWT_SECRET, INTERNAL_API_KEY
-./scripts/dev.sh setup    # install db + root + agent, apply migrations
-./scripts/dev.sh start    # MariaDB + server :3000 + agent :8000
-./scripts/dev.sh logs
-./scripts/dev.sh stop
+git clone <repository-url> kosply-backend
+cd kosply-backend
 ```
 
-`setup` is the one command you need. It installs all three components and
-applies migrations; `start` on its own tells you to run it.
+### 2. Configure
+
+```bash
+cp .env.example .env
+```
+
+Fill in at least `DATABASE_URL`, `JWT_SECRET`, `INTERNAL_API_KEY` and the
+`MARIADB_*` bootstrap values. `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` /
+`SEED_ADMIN_NAME` are optional and only used by the demo seed in step 5.
+
+### 3. Start the database (Docker)
+
+```bash
+docker compose up -d mariadb
+```
+
+On the first start of an empty volume, `lib/db/docker/init.sh` creates
+`kosply_dev`, `kosply_staging`, `kosply_main` and the least-privilege
+`kosply_agent` database. This step comes **before** installing, because
+applying migrations needs a reachable database.
+
+### 4. Install dependencies and apply migrations
+
+```bash
+./scripts/dev.sh setup    # db deps + root deps + agent venv, then migrations
+./scripts/dev.sh start    # server :3000 + agent :8000
+```
+
+Check the stack:
+
+```bash
+curl -s localhost:3000/api/health
+./scripts/dev.sh logs     # tail the server + agent logs
+./scripts/dev.sh stop     # stops server + agent; MariaDB keeps running
+```
+
+### 5. Seed the dashboard data
+
+```bash
+./seed.sh                 # operator account + every dashboard fixture
+```
+
+The admin dashboard (separate repo) reads this API through its `API_URL`, so
+seed now and its pages come up populated instead of empty. `./seed.sh` takes
+placeholders by default — set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in
+`.env` to seed a real login. Modes: `./seed.sh accounts` (account only),
+`./seed.sh dashboard` (fixtures only). Full fixture list: `seed/README.md`.
+
+### Reset the database
+
+```bash
+./scripts/dev.sh reset    # drop schema, migrate, re-run the lib/db seed
+./seed.sh                 # then re-add the dashboard demo data
+```
+
+`reset` is destructive and deliberately interactive: it prints the target
+database and asks you to **type its name** (`kosply_dev`) before touching
+anything. Two different seeds are involved and they do not overlap:
+`lib/db/schema/seed.js` (run by `dev.sh reset`) creates minimal marketplace
+fixtures with non-loginable marker hashes, while `./seed.sh` creates the
+operator account and everything the dashboard renders.
+
+To stop the database itself use `docker compose down` (the volume is kept); to
+wipe that volume as well — a true from-zero run — `docker compose down -v` and
+start again from step 3.
 
 To run just the server in the foreground (no PM2, no Go toolchain):
 
@@ -86,6 +168,21 @@ To run just the server in the foreground (no PM2, no Go toolchain):
 
 See `scripts/README.md` for every command and for why the startup order is
 MariaDB → migrations → server → agent.
+
+## Seed dashboard demo data
+
+Fill a dev database with everything the admin dashboard renders — the
+login-able operator account, KTM verifications, fraud reports, support tickets
+(with threads), AI models and tool-invocation benchmark rows — so no dashboard
+page is empty. Commands live in step 5 of
+[Getting started](#getting-started); the rules behind them:
+
+The script ships with **placeholders** (`admin@example.com` / `ChangeMe-…`):
+set your own values in `.env` (`SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`,
+`SEED_ADMIN_NAME`) or pass them inline. `seed/guard.js` refuses
+`NODE_ENV=production` and any database that is not `kosply_dev`, `kosply_test`
+or `test`. Re-running is idempotent — rows upsert on stable keys. Full fixture
+list and design rules: `seed/README.md`.
 
 ## Testing
 
@@ -236,5 +333,6 @@ Honest list of what is *not* finished:
 | `lib/agent/README.md` | agent detail |
 | `lib/agent/agent_spec/tables/` | per-subsystem design notes |
 | `lib/db/README.md` | schema and migration workflow |
+| `seed/README.md` | dashboard demo fixtures, and how to run `./seed.sh` |
 | `scripts/README.md` | every script, and the ordering rules |
 | `postman/README.md` | the API catalog, run order, and the validator |
