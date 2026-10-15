@@ -1,18 +1,26 @@
 # ai_messages — implemented
 
-One message inside an AI chat session — either the human side or the AI side.
+Messages inside an AI session.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | |
-| `conversationId` | String | FK `ai_conversations.id` Cascade | |
-| `role` | `AiMessageRole` | default `USER` | `USER \| ASSISTANT \| SYSTEM` (system = hidden instruction/context) |
-| `content` | Text | not null | message body |
-| `model` | String? | nullable | AI model used for `ASSISTANT` messages |
-| `createdAt` | DateTime | default now() | history ordering |
+| `id` | varchar(191) | PK |  |
+| `conversationId` | varchar(191) | FK (conversation → ai_conversations.id) |  |
+| `role` | enum |  | who spoke |
+| `content` | text |  |  |
+| `model` | varchar(191) null |  | must match `ai_models.modelId` for cost tracking |
+| `createdAt` | datetime(3) |  |  |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `@@index([conversationId, createdAt])` — fast history load for resume.
+- `conversationId`, `createdAt` — index
+
+## Relations
+
+- `conversation`: one row here relates to a row in `ai_conversations`, matched on `ai_conversations.id` = `ai_messages.conversationId` (declared in `src/schema.js`)

@@ -1,31 +1,41 @@
 # reports — implemented
 
-Fraud reports from the catalog (Report button in the UI).
+Fraud reports against a listing and/or a user, with the admin action taken.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | internal report id |
-| `reportNo` | String | unique, not null | display number `RPT-YYYYMMDD-XXXX` (generated in service) |
-| `reporterId` | String | FK `users.id` Cascade | reporter |
-| `reportedUserId` | String? | FK `users.id` SetNull, nullable | fraud / reported person; `null` = reporting only a listing |
-| `reportedProductId` | String? | FK `products.id` SetNull, nullable | reported listing; `null` = reporting only a user |
-| `category` | `ReportCategory` | default `LAINNYA` | UI options: `PENIPUAN \| BARANG_PALSU \| BARANG_TIDAK_SESUAI \| HARGA_MENYESATKAN \| KONTEN_TIDAK_PANTAS \| SPAM \| LAINNYA` |
-| `description` | Text | not null | report detail |
-| `evidenceUrls` | String[] | default `[]` | screenshots / chat evidence |
-| `status` | `ReportStatus` | default `PENDING` | `PENDING \| IN_REVIEW \| RESOLVED \| REJECTED` |
-| `action` | `ReportAction` | default `NONE` | `WARNING \| DELETE_PRODUCT (remove listing) \| BAN_USER` |
-| `actionNote` | String? | nullable | action reason |
-| `reviewedBy` | String? | FK `users.id` SetNull | acting admin |
-| `reviewedAt` | DateTime? | nullable | |
-| `createdAt` / `updatedAt` | DateTime | auto | |
+| `id` | varchar(191) | PK |  |
+| `reportNo` | varchar(191) |  | `RPT-YYYYMMDD-XXXX`, unique, retried on collision |
+| `reporterId` | varchar(191) |  |  |
+| `reportedUserId` | varchar(191) null | FK (reportedUser → users.id) | nullable, `SetNull` |
+| `reportedProductId` | varchar(191) null | FK (reportedProduct → products.id) | nullable, `SetNull` |
+| `category` | enum |  |  |
+| `description` | text |  | report detail from the UI |
+| `evidenceUrls` | longtext |  | JSON array of screenshot URLs; `CHECK (JSON_VALID(...))` |
+| `status` | enum |  |  |
+| `action` | enum |  |  |
+| `actionNote` | varchar(191) null |  |  |
+| `reviewedBy` | varchar(191) null |  | plain text, **no FK** — may be an `admins` row |
+| `reviewedAt` | datetime(3) null |  |  |
+| `createdAt` | datetime(3) |  |  |
+| `updatedAt` | datetime(3) |  | maintained by the statement builder |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `[reporterId]`, `[reportedUserId]`, `[reportedProductId]`, `[status]`, `[category]`.
+- `category` — index
+- `reportedProductId` — index
+- `reportedUserId` — index
+- `reporterId` — index
+- `reportNo` — unique
+- `status` — index
 
-## Rules
+## Relations
 
-- At least one target must be filled (`reportedUserId` and/or `reportedProductId`) — validated in the service.
-- Action execution in the admin service: `WARNING` → flag; `DELETE_PRODUCT` → `products.status=ARCHIVED`; `BAN_USER` → freeze (`seller_verifications.isActive=false` and/or deactivate the user).
+- `reportedProduct`: one row here relates to a row in `products`, matched on `products.id` = `reports.reportedProductId` (declared in `src/schema.js`)
+- `reportedUser`: one row here relates to a row in `users`, matched on `users.id` = `reports.reportedUserId` (declared in `src/schema.js`)

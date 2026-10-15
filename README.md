@@ -1,7 +1,7 @@
 # Kosply-backend
 
 Kosply — marketplace barang second-hand untuk mahasiswa. Backend monorepo: satu
-Express API, satu AI agent (Python/FastAPI), satu skema database (Prisma), plus
+Express API, satu AI agent (Python/FastAPI), satu skema database (MariaDB), plus
 CLI monitoring (Go).
 
 ## Stack
@@ -10,7 +10,7 @@ CLI monitoring (Go).
 |---|---|
 | `lib/server` | Node >=18, Express 4 |
 | `lib/agent` | Python >=3.10, FastAPI, LangGraph, uvicorn |
-| `lib/db` | PostgreSQL 16, Prisma 6 |
+| `lib/db` | MariaDB 11.4 + mysql2 (tanpa ORM) |
 | `lib/server-monitoring` | Go, stdlib only (`kosmon`) |
 | Proses | PM2 (`ecosystem.config.js`) |
 
@@ -34,7 +34,7 @@ Kosply-backend/
   scripts/                  # workflow helpers, see scripts/README.md
     dev.sh                  # local stack: MariaDB + server + agent, one ctrl-c
     server.sh               # server: `dev` foreground, staging/main via PM2
-    db/db.sh                # Prisma + MariaDB workflows
+    db/db.sh                # migrasi + drift gate MariaDB
     agent/agent.sh          # venv, run and test the Python agent
     postman/validate.sh     # catalog-vs-routes drift check (runs in CI)
     _common.sh              # shared helpers (env loading, readiness probes)
@@ -42,7 +42,7 @@ Kosply-backend/
     server/                 # Express API — the whole public surface
       server.js             # entrypoint + graceful shutdown
       app.js                # global middleware (helmet, cors, body, routes)
-      config/               # env + Prisma client lifecycle
+      config/               # env + gateway ke lib/db
       routes/               # index.js aggregator + *.route.js per module
       controllers/          # thin HTTP layer (req/res)
       services/             # business logic + shared/validators.js
@@ -57,7 +57,6 @@ Kosply-backend/
       agent_spec/tables/    # per-subsystem design notes
       tests/
     db/                     # schema + migrations are the source of truth
-      schema/schema.db
       schema/migrations/
       schema/seed.js
       docker/init.sh|.sql   # cluster bootstrap
@@ -189,7 +188,7 @@ list and design rules: `seed/README.md`.
 ```bash
 npm test                      # server + db (needs DATABASE_URL)
 ./scripts/agent/agent.sh test # agent (pytest)
-./scripts/db/db.sh drift      # migrations must reproduce schema.db
+./scripts/db/db.sh drift      # migrations harus cocok dengan column registry
 ./scripts/postman/validate.sh # the Postman catalog still matches the routes
 ```
 
@@ -197,7 +196,7 @@ npm test                      # server + db (needs DATABASE_URL)
 process and would otherwise trip its own throttling.
 `tests/shared/rate_limit.test.js` re-enables it and asserts the real behaviour.
 
-CI additionally runs the agent suite, `prisma migrate deploy` against a real
+CI additionally runs the agent suite, `db.sh deploy` against a real
 MariaDB, the drift gate, and a check that the Postman catalog still matches the
 routes. That last one exists because the catalog is maintained by hand in two
 formats, and it had silently fallen behind — a new route with no catalog entry
@@ -207,7 +206,7 @@ now fails the build.
 
 | Key | Required | Notes |
 |---|---|---|
-| `DATABASE_URL` | yes | Prisma + the agent's checkpointer |
+| `DATABASE_URL` | yes | the data layer + the agent's checkpointer |
 | `JWT_SECRET` | yes (production) | Production boot **fails** if unset or left at the published dev value |
 | `INTERNAL_API_KEY` | yes | Guards `/api/internal/*` (the agent → server API) |
 | `NODE_ENV` | no | `development` \| `staging` \| `production` |
@@ -263,7 +262,7 @@ email, password reset 5/15min, register 10/hour, public analytics ingest
 120/min. Counters are in-process, so under PM2 the ceiling is roughly
 `limit × instances` — a shared store is the production answer.
 
-**No user input reaches Prisma unvalidated.** `services/shared/validators.js`
+**No user input reaches the database unvalidated.** `services/shared/validators.js`
 (`toId`, `toText`, `toNumber`, `toQueryInt`) is the boundary, including for ids
 the *model* chose.
 

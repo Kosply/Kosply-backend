@@ -1,25 +1,33 @@
 # messages — implemented
 
-One COD chat bubble. Content depends on `type`.
+Chat bubbles inside a conversation.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | |
-| `conversationId` | String | FK `conversations.id` Cascade | |
-| `senderId` | String | FK `users.id` Cascade | sender (buyer/seller) |
-| `type` | `MessageType` | default `TEXT` | `TEXT \| IMAGE \| LOCATION \| SYSTEM` |
-| `text` | Text? | nullable | used when `TEXT` |
-| `imageUrl` | String? | nullable | used when `IMAGE` (item photo / proof) |
-| `latitude` | Float? | nullable | used when `LOCATION` |
-| `longitude` | Float? | nullable | used when `LOCATION` |
-| `locationLabel` | String? | nullable | COD point label, used when `LOCATION` |
-| `isRead` | Boolean | default `false` | |
-| `readAt` | DateTime? | nullable | |
-| `createdAt` | DateTime | default now() | history ordering |
+| `id` | varchar(191) | PK |  |
+| `conversationId` | varchar(191) | FK (conversation → conversations.id) |  |
+| `senderId` | varchar(191) |  |  |
+| `type` | enum |  | bubble kind |
+| `text` | text null |  | required for `TEXT` |
+| `imageUrl` | varchar(191) null |  | required for `IMAGE`; scheme-checked |
+| `latitude` | double null |  | required for `LOCATION` |
+| `longitude` | double null |  | required for `LOCATION` |
+| `locationLabel` | varchar(191) null |  | required for `LOCATION` |
+| `isRead` | tinyint(1) |  |  |
+| `readAt` | datetime(3) null |  |  |
+| `createdAt` | datetime(3) |  |  |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `@@index([conversationId, createdAt])` — fast history pagination.
-- `@@index([senderId])`.
+- `conversationId`, `createdAt` — index
+- `senderId` — index
+
+## Relations
+
+- `conversation`: one row here relates to a row in `conversations`, matched on `conversations.id` = `messages.conversationId` (declared in `src/schema.js`)

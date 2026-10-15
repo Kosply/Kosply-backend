@@ -16,19 +16,19 @@
 const os = require('node:os');
 
 /**
- * @dev MariaDB's default `max_connections` is 150 (100 on older images). Prisma's default pool is
- * @dev `cpus * 2 + 1` *per worker*, so `instances: 'max'` on a 7+ core box
- * @dev asked for 120+ connections and the database refused with
- * @dev "sorry, too many clients already" (P2037/P2024) — a full outage at the
- * @dev first load spike. Cap the pool per worker and size the worker count
- * @dev against the connection budget instead of the core count.
+ * @dev MariaDB's default `max_connections` is 150 (100 on older images). The
+ * @dev previous ORM's default pool was `cpus * 2 + 1` *per worker*, so
+ * @dev `instances: 'max'` on a 7+ core box asked for 120+ connections and the
+ * @dev database refused with "sorry, too many clients already" — a full outage
+ * @dev at the first load spike. Cap the pool per worker and size the worker
+ * @dev count against the connection budget instead of the core count.
  */
 /**
- * Per-process ceiling. `main` must fit inside it on its own: a previous
- * budget of 4 workers x 12 connections = 48 against Postgres'
- * `CONNECTION LIMIT 40` still produced "too many clients already". MariaDB
- * has no per-database connection limit, so this is now purely a
- * self-imposed budget (and init.sh does not grant CONNECTION LIMIT).
+ * Per-process ceiling. `main` must fit inside it on its own: a previous budget
+ * of 4 workers x 12 connections = 48 against a `CONNECTION LIMIT 40` still
+ * produced "too many clients already". MariaDB has no per-database connection
+ * limit, so this is now purely a self-imposed budget (and init.sh does not
+ * grant CONNECTION LIMIT).
  */
 const DB_CONNECTION_LIMIT = Number.parseInt(process.env.DB_CONNECTION_LIMIT || '40', 10);
 const STAGING_INSTANCES = 1;
@@ -39,10 +39,24 @@ const MAIN_INSTANCES = Math.max(
   Math.min(os.cpus().length, Math.floor((DB_CONNECTION_LIMIT - 8) / POOL_PER_WORKER), 4)
 );
 
-const withPool = (url) =>
-  url && url.includes('?')
-    ? `${url}&connection_limit=${POOL_PER_WORKER}&pool_timeout=20&connect_timeout=10`
-    : `${url}?connection_limit=${POOL_PER_WORKER}&pool_timeout=20&connect_timeout=10`;
+/**
+ * Hand the pool budget to the process through the environment.
+ * @dev These used to be query-string parameters on DATABASE_URL, which only the
+ * @dev previous ORM understood. The driver reads neither, so leaving them there
+ * @dev would have silently dropped the 8-connections-per-worker ceiling and
+ * @dev let `instances: 'max'` open an unbounded pool — the exact "too many
+ * @dev clients" outage the numbers above were introduced to prevent.
+ * @dev `lib/db/src/pool.js` reads `DB_POOL_SIZE` first and still honours a
+ * @dev `connection_limit` parameter if one is present, so an existing DSN keeps
+ * @dev working during the rollout.
+ */
+const withPool = (url) => url;
+
+const poolEnv = () => ({
+  DB_POOL_SIZE: String(POOL_PER_WORKER),
+  DB_POOL_QUEUE_TIMEOUT_MS: '20000',
+  DB_CONNECT_TIMEOUT_MS: '10000',
+});
 
 const stagingDb = process.env.STAGING_DATABASE_URL || 'mysql://kosply:kosply@localhost:3306/kosply_staging';
 const mainDb = process.env.DATABASE_URL || 'mysql://kosply:kosply@localhost:3306/kosply_main';
@@ -52,7 +66,7 @@ const common = {
   watch: false,
   autorestart: true,
   // Without a backoff a deterministically-crashing worker (bad PORT, missing
-  // Prisma client) restarted in a tight loop, spamming the DB and the logs.
+  // database driver) restarted in a tight loop, spamming the DB and the logs.
   restart_delay: 2000,
   exp_backoff_restart_delay: 2000,
   max_restarts: 15,
@@ -84,6 +98,7 @@ module.exports = {
         PORT: 3001,
         CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
         DATABASE_URL: withPool(stagingDb),
+        ...poolEnv(),
         // Secrets are passed through from the operator's environment.
         ...(process.env.JWT_SECRET ? { JWT_SECRET: process.env.JWT_SECRET } : {}),
         ...(process.env.INTERNAL_API_KEY ? { INTERNAL_API_KEY: process.env.INTERNAL_API_KEY } : {}),
@@ -101,6 +116,7 @@ module.exports = {
         PORT: 3000,
         CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
         DATABASE_URL: withPool(mainDb),
+        ...poolEnv(),
         ...(process.env.JWT_SECRET ? { JWT_SECRET: process.env.JWT_SECRET } : {}),
         ...(process.env.INTERNAL_API_KEY ? { INTERNAL_API_KEY: process.env.INTERNAL_API_KEY } : {}),
       },

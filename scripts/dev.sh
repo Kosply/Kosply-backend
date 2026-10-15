@@ -37,7 +37,7 @@ Usage: ./scripts/dev.sh [command]
   reset     Drop the local schema, re-migrate, and re-seed
 
 Environment
-  PORT           server port (default 3000)
+  PORT           server port (default 3500; does not inherit .env PORT)
   AGENT_PORT     agent port  (default 8000)
 EOF
 }
@@ -77,24 +77,32 @@ cmd_start() {
   wait_for_db
   [ -d "$ROOT/node_modules" ] || die "root dependencies missing. Run: $0 setup"
 
+  # Dashboard API_URL is http://localhost:3500 because Next occupies :3000.
+  # load_env sources repo `.env` (PORT=3000 for PM2 main); do not inherit that
+  # for the local stack. An explicit PORT=... on the command line still wins.
+  PORT="${CLI_PORT:-3500}"
+  AGENT_PORT="${AGENT_PORT:-8000}"
+  KOSPLY_SERVER_URL="${KOSPLY_SERVER_URL:-http://localhost:${PORT}}"
+
   if running server; then warn "server already running (pid $(read_pid server))"; else
-    log "Starting the server on :${PORT:-3000}"
-    ( cd "$ROOT" && PORT="${PORT:-3000}" NODE_ENV=development \
+    log "Starting the server on :${PORT}"
+    ( cd "$ROOT" && PORT="${PORT}" NODE_ENV=development \
         node lib/server/server.js ) >"$SERVER_LOG" 2>&1 &
     write_pid server $!
-    wait_for_http "http://localhost:${PORT:-3000}/api/health" "server" 45 \
+    wait_for_http "http://localhost:${PORT}/api/health" "server" 45 \
       || { tail -20 "$SERVER_LOG" >&2; die "the server did not become healthy"; }
   fi
 
   if running agent; then warn "agent already running (pid $(read_pid agent))"; else
     if [ -x "$ROOT/lib/agent/.venv/bin/uvicorn" ]; then
-      log "Starting the agent on :${AGENT_PORT:-8000}"
-      ( cd "$ROOT/lib/agent" && PORT="${AGENT_PORT:-8000}" \
+      log "Starting the agent on :${AGENT_PORT}"
+      ( cd "$ROOT/lib/agent" && PORT="${AGENT_PORT}" \
+          KOSPLY_SERVER_URL="${KOSPLY_SERVER_URL}" \
           "$ROOT/lib/agent/.venv/bin/uvicorn" app.main:app \
-          --host 127.0.0.1 --port "${AGENT_PORT:-8000}" --no-access-log ) \
+          --host 127.0.0.1 --port "${AGENT_PORT}" --no-access-log ) \
         >"$AGENT_LOG" 2>&1 &
       write_pid agent $!
-      wait_for_http "http://localhost:${AGENT_PORT:-8000}/health" "agent" 45 \
+      wait_for_http "http://localhost:${AGENT_PORT}/health" "agent" 45 \
         || note "the agent is not answering /health yet; check $AGENT_LOG"
     else
       warn "agent virtualenv missing; skipping the agent. Run: $0 setup"
@@ -103,8 +111,8 @@ cmd_start() {
 
   echo
   ok "stack is up"
-  note "server  http://localhost:${PORT:-3000}"
-  note "agent   http://localhost:${AGENT_PORT:-8000}"
+  note "server  http://localhost:${PORT}"
+  note "agent   http://localhost:${AGENT_PORT}"
   note "logs    $RUN_DIR/{server,agent}.log   (./scripts/dev.sh logs)"
   echo
 }
@@ -148,6 +156,8 @@ cmd_reset() {
 }
 
 main() {
+  # Capture before load_env: `source .env` overwrites PORT, and `.env` has 3000.
+  CLI_PORT="${PORT:-}"
   load_env ""
   # `-h` / `--help` anywhere means help, even after a valid command:
   # `./scripts/dev.sh logs --help` must not fall through into `tail -F`.

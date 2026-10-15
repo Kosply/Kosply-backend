@@ -8,7 +8,7 @@ conversations resumable across turns **and** restarts.
 | set | `AIOMySQLSaver` (tables auto-created via `setup()`) | yes |
 | empty | `InMemorySaver` dev fallback | no (process memory only) |
 
-> DSN note: Prisma-only params (`?schema=`, `?connection_limit=` …) are stripped
+> DSN note: non-MySQL params (`?schema=`, `?connection_limit=` …) are stripped
 > by `mysql_dsn` (`app/core/config/`) before connecting; `mysql_conn_kwargs`
 > parses the same URL into aiomysql/pymysql kwargs.
 

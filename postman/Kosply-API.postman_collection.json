@@ -2,7 +2,7 @@
  "info": {
   "_postman_id": "b3a1c7e2-4f6d-4a8b-9c0d-kosply000001",
   "name": "Kosply API",
-  "description": "Kosply backend — marketplace second-hand mahasiswa. Run against http://localhost:3000 (npm start) with MariaDB up + seeded (`npm run seed` in lib/db). Flow: Auth/Register (or Login) first — the token is captured automatically.",
+  "description": "Kosply backend \u2014 marketplace second-hand mahasiswa. Run against http://localhost:3000 (npm start) with MariaDB up + seeded (`npm run seed` in lib/db). Flow: Auth/Register (or Login) first \u2014 the token is captured automatically.",
   "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
  },
  "auth": {
@@ -35,6 +35,10 @@
   },
   {
    "key": "token",
+   "value": ""
+  },
+  {
+   "key": "refreshToken",
    "value": ""
   },
   {
@@ -223,7 +227,8 @@
          "pm.test(\"registered\", () => pm.response.to.have.status(201));",
          "const j = pm.response.json();",
          "pm.collectionVariables.set(\"token\", j.token);",
-         "pm.collectionVariables.set(\"userId\", j.user.id);"
+         "pm.collectionVariables.set(\"userId\", j.user.id);",
+         "pm.collectionVariables.set(\"refreshToken\", j.refreshToken || \"\");"
         ],
         "type": "text/javascript"
        }
@@ -314,7 +319,8 @@
          "pm.test(\"logged in\", () => pm.response.to.have.status(200));",
          "const j = pm.response.json();",
          "pm.collectionVariables.set(\"token\", j.token);",
-         "pm.collectionVariables.set(\"userId\", j.user.id);"
+         "pm.collectionVariables.set(\"userId\", j.user.id);",
+         "pm.collectionVariables.set(\"refreshToken\", j.refreshToken || \"\");"
         ],
         "type": "text/javascript"
        }
@@ -685,6 +691,100 @@
        "body": "{\"status\": \"ok\", \"user\": {\"id\": \"u9\", \"email\": \"s@kosply.test\", \"username\": \"s9\", \"name\": \"Social\", \"role\": \"BUYER\", \"universitas\": \"\", \"programStudi\": \"\", \"onboardingRequired\": true}, \"token\": \"jwt\", \"onboardingRequired\": true, \"isNew\": true}"
       }
      ]
+    },
+    {
+     "name": "POST Refresh",
+     "request": {
+      "description": "Exchange a refresh token for a new access token + refresh token (200). The presented token is consumed; replaying it is treated as theft and revokes the family.",
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{baseUrl}}/api/auth/refresh",
+       "host": [
+        "{{baseUrl}}"
+       ],
+       "path": [
+        "api",
+        "auth",
+        "refresh"
+       ]
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"refreshed\", () => pm.response.to.have.status(200));",
+         "const j = pm.response.json();",
+         "pm.collectionVariables.set(\"token\", j.token);",
+         "pm.collectionVariables.set(\"refreshToken\", j.refreshToken);"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "response": []
+    },
+    {
+     "name": "POST Logout",
+     "request": {
+      "description": "End the session behind a refresh token (200). Works with an expired access token, because the refresh token is the credential that outlives it.",
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{baseUrl}}/api/auth/logout",
+       "host": [
+        "{{baseUrl}}"
+       ],
+       "path": [
+        "api",
+        "auth",
+        "logout"
+       ]
+      }
+     },
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"logged out\", () => pm.response.to.have.status(200));",
+         "pm.collectionVariables.set(\"refreshToken\", \"\");"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "response": []
     }
    ]
   },
@@ -1896,7 +1996,7 @@
     {
      "name": "POST Open ticket",
      "request": {
-      "description": "Open a help ticket (KSP-…). Captures ticketId.",
+      "description": "Open a help ticket (KSP-\u2026). Captures ticketId.",
       "method": "POST",
       "header": [
        {
@@ -2252,7 +2352,7 @@
     {
      "name": "POST File report",
      "request": {
-      "description": "Report fraud (RPT-…). Needs a target. Captures reportId.",
+      "description": "Report fraud (RPT-\u2026). Needs a target. Captures reportId.",
       "method": "POST",
       "header": [
        {
@@ -3471,7 +3571,7 @@
     {
      "name": "POST Contact request",
      "request": {
-      "description": "Backs the approval-gated `request_seller_contact` tool. NOTE: intake only — it returns 202 and creates no chat room and sends no notification yet.",
+      "description": "Backs the approval-gated `request_seller_contact` tool. NOTE: intake only \u2014 it returns 202 and creates no chat room and sends no notification yet.",
       "method": "POST",
       "header": [
        {

@@ -233,7 +233,7 @@ const invocationTime = (index) => {
  * @dev Regenerated from the plan on every run and inserted as a set, so the
  * @dev table always matches the plan exactly instead of accumulating stale rows.
  * @param {Record<string, string>} userIds email → user id map from the user pass.
- * @returns {object[]} Rows ready for `prisma.toolInvocation.createMany`.
+ * @returns {object[]} Rows to insert into `tool_invocations`.
  */
 const buildToolInvocations = (userIds) => {
   const callerIds = Object.values(userIds);
@@ -262,19 +262,16 @@ const buildToolInvocations = (userIds) => {
 
 /**
  * @notice Write every dashboard fixture.
- * @param {import('@prisma/client').PrismaClient} prisma Prisma client singleton.
+ * @param {object} db Data layer.
  * @param {{ adminUserId: string }} context Ids from `accounts.js` used for audit fields.
  * @returns {Promise<Record<string, number>>} Row counts per surface, for the run report.
  */
-const seedDashboard = async (prisma, context) => {
+const seedDashboard = async (db, context) => {
   /** @type {Record<string, string>} email → user id */
   const userIds = {};
 
   for (const user of USERS) {
-    const record = await prisma.user.upsert({
-      where: { email: user.email },
-      update: { name: user.name, role: user.role, isActive: user.isActive ?? true, bio: user.bio ?? null },
-      create: {
+    const record = await db.upsert('users', {
         email: user.email,
         username: user.username,
         name: user.name,
@@ -284,20 +281,14 @@ const seedDashboard = async (prisma, context) => {
         role: user.role,
         bio: user.bio ?? null,
         isActive: user.isActive ?? true,
-      },
-      select: { id: true },
-    });
+      }, { where: { email: user.email }, update: { name: user.name, role: user.role, isActive: user.isActive ?? true, bio: user.bio ?? null } });
     userIds[user.email] = record.id;
   }
 
   for (const product of PRODUCTS) {
     const { id, sellerEmail, ...fields } = product;
     const data = { ...fields, sellerId: userIds[sellerEmail] };
-    await prisma.product.upsert({
-      where: { id },
-      update: data,
-      create: { id, ...data },
-    });
+    await db.upsert('products', { id, ...data }, { where: { id }, update: data });
   }
 
   for (const verification of VERIFICATIONS) {
@@ -309,11 +300,7 @@ const seedDashboard = async (prisma, context) => {
       reviewedAt: reviewedAt ?? null,
       reviewedBy: reviewedAt ? context.adminUserId : null,
     };
-    await prisma.sellerVerification.upsert({
-      where: { userId },
-      update: { ...data, updatedAt: updatedAt ?? new Date() },
-      create: { ...data, ...(updatedAt && { updatedAt }) },
-    });
+    await db.upsert('seller_verifications', { ...data, ...(updatedAt && { updatedAt }) }, { where: { userId }, update: { ...data, updatedAt: updatedAt ?? new Date() } });
   }
 
   for (const report of REPORTS) {
@@ -324,26 +311,15 @@ const seedDashboard = async (prisma, context) => {
       reportedUserId: reportedUserEmail ? userIds[reportedUserEmail] : null,
       reviewedBy: fields.reviewedAt ? context.adminUserId : null,
     };
-    await prisma.report.upsert({
-      where: { reportNo: report.reportNo },
-      update: { ...data, createdAt, updatedAt },
-      create: { ...data, createdAt, updatedAt },
-    });
+    await db.upsert('reports', { ...data, createdAt, updatedAt }, { where: { reportNo: report.reportNo }, update: { ...data, createdAt, updatedAt } });
   }
 
   for (const ticket of TICKETS) {
     const { userEmail, messages, ...fields } = ticket;
     const userId = userIds[userEmail];
     const ticketData = { ...fields, userId };
-    await prisma.supportTicket.upsert({
-      where: { ticketNo: ticket.ticketNo },
-      update: ticketData,
-      create: ticketData,
-    });
-    const ticketRow = await prisma.supportTicket.findUnique({
-      where: { ticketNo: ticket.ticketNo },
-      select: { id: true },
-    });
+    await db.upsert('support_tickets', ticketData, { where: { ticketNo: ticket.ticketNo }, update: ticketData });
+    const ticketRow = await db.selectOne('support_tickets', { where: { ticketNo: ticket.ticketNo } });
 
     for (const message of messages) {
       const isUser = message.sender === 'user';
@@ -358,28 +334,25 @@ const seedDashboard = async (prisma, context) => {
         isRead: message.isRead ?? false,
         createdAt: message.createdAt,
       };
-      await prisma.supportMessage.upsert({
-        where: { id: message.id },
-        update: messageData,
-        create: { id: message.id, ...messageData },
-      });
+      await db.upsert('support_messages', { id: message.id, ...messageData }, { where: { id: message.id }, update: messageData });
     }
   }
 
   for (const model of MODELS) {
-    await prisma.aiModel.upsert({
-      where: { modelId: model.modelId },
-      update: model,
-      create: model,
-    });
+    await db.upsert('ai_models', model, { where: { modelId: model.modelId }, update: model });
   }
 
   // Tool invocations are a log, not a mutable entity: the plan is regenerated
   // and re-inserted as a set, so the table always matches TOOL_PLAN instead of
   // accumulating stale rows from an earlier plan.
-  await prisma.toolInvocation.deleteMany({ where: { id: { startsWith: 'seed-tool-' } } });
+  await db.remove('tool_invocations', { where: { id: { startsWith: 'seed-tool-' } } });
   const toolInvocations = buildToolInvocations(userIds);
-  await prisma.toolInvocation.createMany({ data: toolInvocations });
+  // Sequential inserts rather than one multi-row statement: these carry a
+  // generated primary key each, so a single statement would buy nothing and a
+  // partial failure would be harder to reason about than a plain loop.
+  for (const invocation of toolInvocations) {
+    await db.insert('tool_invocations', invocation);
+  }
 
   return {
     users: USERS.length,

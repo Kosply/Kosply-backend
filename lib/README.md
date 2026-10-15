@@ -10,7 +10,7 @@ directly — they communicate over HTTP.
 |---|---|---|
 | `server/` | Node (Express) | The public HTTP API: staging `:3001`, main `:3000` |
 | `agent/` | Python (FastAPI + LangGraph) | Internal AI service: chat, streaming, human approval |
-| `db/` | Node (Prisma) + MariaDB 11.4 | Schema, migrations, shared read shapes (a library, not a process) |
+| `db/` | Node (mysql2) + MariaDB 11.4 | Schema, migrations, data layer, shared read shapes (a library, not a process) |
 | `server-monitoring/` | Go (`kosmon` CLI) | Test endpoints, drive staging/main through PM2 |
 
 There is also `postman/` at the repository root: the API catalog, checked
@@ -26,7 +26,7 @@ Details live in each folder's README:
 ## Rules for adding a new lib
 
 1. **One folder per runtime.** `server/` Node, `agent/` Python,
-   `server-monitoring/` Go. Exception: `db/` is a shared library (Prisma schema
+   `server-monitoring/` Go. Exception: `db/` is a shared library (schema
    + client) rather than a running process.
 2. **Own manifest only.** `package.json` for Node, `requirements.txt` for
    Python, `go.mod` for Go. Never mix them in one folder.

@@ -1,34 +1,41 @@
 # products — implemented
 
-Student second-hand catalog. Seller = `users` with `role=SELLER`.
+The second-hand catalog. Seller = a `users` row with an approved, active verification.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | |
-| `sellerId` | String | FK `users.id` Cascade | storefront owner |
-| `title` | String | not null | title |
-| `description` | Text | not null | second-hand condition description |
-| `price` | Int | not null | rupiah, `>= 0` (service validation) |
-| `stock` | Int | default `1` | quantities / stock |
-| `imageUrls` | String[] | default `[]` | item photos 1..N, cover = `[0]` |
-| `category` | String? | nullable | **blank for now**, TODO: become a `Category` FK |
-| `latitude` | Float? | nullable | item location, set when creating the catalog |
-| `longitude` | Float? | nullable | |
-| `locationLabel` | String? | nullable | location label, e.g. boarding-house / campus area |
-| `status` | `ProductStatus` | default `ACTIVE` | `ACTIVE \| SOLD \| ARCHIVED` |
-| `createdAt` / `updatedAt` | DateTime | auto | |
+| `id` | varchar(191) | PK |  |
+| `sellerId` | varchar(191) |  | storefront owner |
+| `title` | varchar(191) |  |  |
+| `description` | text |  |  |
+| `price` | int(11) |  | rupiah; `CHECK (price >= 0)` |
+| `stock` | int(11) |  | `CHECK (stock >= 0)` |
+| `imageUrls` | longtext |  | JSON array of URLs, cover = `[0]`; `CHECK (JSON_VALID(...))` |
+| `category` | varchar(191) null |  | free text, **blank for now**, TODO: a `Category` FK |
+| `latitude` | double null |  | `CHECK` within ±90 |
+| `longitude` | double null |  | `CHECK` within ±180 |
+| `locationLabel` | varchar(191) null |  |  |
+| `status` | enum |  | lifecycle state |
+| `soldAt` | datetime(3) null |  | immutable sale fact; analytics key off this, not `status` |
+| `createdAt` | datetime(3) |  |  |
+| `updatedAt` | datetime(3) |  | maintained by the statement builder |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `[sellerId]`, `[status]`, `[category]` — catalog + seller storefront filters.
+- `category` — index
+- `sellerId` — index
+- `sellerId`, `soldAt` — index
+- `sellerId`, `status` — index
+- `status`, `createdAt` — index
+- `status` — index
 
 ## Relations
 
-- `conversations`: chat rooms discussing this product.
-- `reports`: fraud reports against this listing.
-
-## Rules
-
-- Admin deletion (`ReportAction.DELETE_PRODUCT`) = set `status=ARCHIVED`, never hard-delete so chat/report history stays intact.
+- `events`: one row here relates to a row in `product_events`, matched on `product_events.productId` = `products.id` (declared in `src/schema.js`)
+- `conversations`: one row here relates to a row in `conversations`, matched on `conversations.productId` = `products.id` (declared in `src/schema.js`)

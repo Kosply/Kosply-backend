@@ -1,31 +1,26 @@
 # ai_models — implemented
 
-AI model registry. Admins add models here; chat sessions reference them via `modelId`.
+Registry of AI models the client may pick, with per-token pricing.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | internal id |
-| `modelId` | String | unique, not null | code used in the app, e.g. `muse-spark-1.3` |
-| `name` | String | not null | display name, e.g. Muse Spark 1.3 |
-| `inputPrice` | Float | not null | USD per 1M input tokens |
-| `outputPrice` | Float | not null | USD per 1M output tokens |
-| `cacheReadPrice` | Float | default `0` | USD per 1M cache-read tokens |
-| `isActive` | Boolean | default `true` | `false` = disabled, cannot be picked for new chats |
-| `createdAt` / `updatedAt` | DateTime | auto | |
+| `id` | varchar(191) | PK |  |
+| `modelId` | varchar(191) |  | code used by the app |
+| `name` | varchar(191) |  |  |
+| `inputPrice` | double |  |  |
+| `outputPrice` | double |  |  |
+| `cacheReadPrice` | double |  | USD per 1M cache-read tokens |
+| `isActive` | tinyint(1) |  | false = hidden from the picker, history kept |
+| `createdAt` | datetime(3) |  |  |
+| `updatedAt` | datetime(3) |  | maintained by the statement builder |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `@@index([isActive])` — model picker lists `isActive=true` only.
-
-## Actions (admin)
-
-- Add → insert row (`modelId` must be unique).
-- Disable → set `isActive=false` (hidden from picker, existing history untouched).
-- Enable → set `isActive=true`.
-- Delete → hard delete the row (only allowed when no `ai_messages` reference its `modelId`; otherwise disable instead).
-
-## Rules
-
-- `ai_messages.model` must match an `ai_models.modelId` so usage cost can be computed as `inputTokens/1M*inputPrice + outputTokens/1M*outputPrice + cacheReadTokens/1M*cacheReadPrice`.
+- `isActive` — index
+- `modelId` — unique

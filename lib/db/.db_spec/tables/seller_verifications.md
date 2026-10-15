@@ -1,34 +1,39 @@
 # seller_verifications — implemented
 
-ID/KTM verification for students who want to sell. One user has one application (`userId` unique).
+Student ID (KTM) verification. One row per user; `APPROVED` + `isActive` is what actually grants selling capability, not `users.role`.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | verification id |
-| `userId` | String | unique, FK `users.id` Cascade | applicant |
-| `namaLengkap` | String | not null | name as printed on KTM (audit, may differ from `users.name` display) |
-| `nim` | String | unique, not null | student ID number |
-| `universitas` | String | not null | university |
-| `programStudi` | String | not null | study program |
-| `ktmImageUrl` | String | not null | KTM photo, **private — admin only** |
-| `status` | `VerificationStatus` | default `PENDING` | `PENDING \| APPROVED \| REJECTED` |
-| `isActive` | Boolean | default `true` | active/non-active status. `false` = frozen, cannot sell |
-| `action` | `VerificationAction` | default `NONE` | admin action: `APPROVE \| REJECT` |
-| `actionNote` | String? | nullable | approve/reject reason |
-| `reviewedBy` | String? | FK `users.id` SetNull | deciding admin |
-| `rejectionReason` | String? | nullable | rejection reason (shown to the applicant) |
-| `reviewedAt` | DateTime? | nullable | decision time |
-| `createdAt` / `updatedAt` | DateTime | auto | |
+| `id` | varchar(191) | PK |  |
+| `userId` | varchar(191) | FK (user → users.id) |  |
+| `namaLengkap` | varchar(191) |  |  |
+| `nim` | varchar(191) |  | unique across the platform |
+| `universitas` | varchar(191) |  |  |
+| `programStudi` | varchar(191) |  |  |
+| `ktmImageUrl` | varchar(191) |  | **private** — admin only, never public |
+| `status` | enum |  | decided by an admin |
+| `isActive` | tinyint(1) |  | false = frozen, cannot sell |
+| `action` | enum |  |  |
+| `actionNote` | varchar(191) null |  |  |
+| `reviewedBy` | varchar(191) null |  | plain text, **no FK** — may be an `admins` row |
+| `rejectionReason` | varchar(191) null |  |  |
+| `reviewedAt` | datetime(3) null |  |  |
+| `createdAt` | datetime(3) |  |  |
+| `updatedAt` | datetime(3) |  |  |
+
+## Keys
+
+- Primary key: `id`
 
 ## Indexes
 
-- `@@index([status])`, `@@index([isActive])` — admin dashboard filters.
+- `isActive` — index
+- `nim` — unique
+- `status` — index
+- `userId` — unique
 
-## Flow (admin dashboard)
+## Relations
 
-1. Application arrives: `status=PENDING, action=NONE, isActive=true`.
-2. Admin clicks Approve → `action=APPROVE, status=APPROVED, reviewedBy, reviewedAt`, service promotes `users.role=SELLER`.
-3. Admin clicks Reject → `action=REJECT, status=REJECTED, rejectionReason`.
-4. Problematic seller (fraud report): admin sets `isActive=false` without deleting data — they can no longer sell.
+- `user`: one row here relates to a row in `users`, matched on `users.id` = `seller_verifications.userId` (declared in `src/schema.js`)

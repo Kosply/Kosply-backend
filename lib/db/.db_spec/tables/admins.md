@@ -1,20 +1,23 @@
 # admins — implemented
 
-Admin accounts for the dashboard only. Deliberately a separate table (apart from `users`) so dashboard sessions never mix with marketplace sessions.
+Dashboard operator accounts. Separate from `users` so marketplace and dashboard sessions never mix.
 
 ## Columns
 
 | Column | Type | Constraint | Notes |
 |---|---|---|---|
-| `id` | String (cuid) | PK | |
-| `email` | String | unique, not null | dashboard login |
-| `name` | String | not null | admin name shown in the dashboard |
-| `passwordHash` | String | not null | never store plain text |
-| `isActive` | Boolean | default `true` | `false` = dashboard access revoked |
-| `createdAt` / `updatedAt` | DateTime | auto | |
+| `id` | varchar(191) | PK |  |
+| `email` | varchar(191) |  | dashboard login identifier |
+| `name` | varchar(191) |  |  |
+| `passwordHash` | varchar(191) |  | never store plain text |
+| `isActive` | tinyint(1) |  | false = dashboard access revoked |
+| `createdAt` | datetime(3) |  |  |
+| `updatedAt` | datetime(3) |  | maintained by the statement builder |
 
-## Rules
+## Keys
 
-- Seed 1 initial admin via service/seed (email + password from env, hashed first).
-- Revoke access by setting `isActive=false`, never delete the row (audit).
-- Different from `users.role=ADMIN`: `users` is for the marketplace (reporters/sellers), `admins` is for dashboard login.
+- Primary key: `id`
+
+## Indexes
+
+- `email` — unique

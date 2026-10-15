@@ -60,40 +60,33 @@ jobs:
         working-directory: lib/db
         run: npm ci
 
-      - name: Generate the Prisma client
+      # No code generation step: the data layer is plain JavaScript and the
+      # column registry is hand-written. The check below is the static
+      # equivalent — it fails on a registry that names a column or relation that
+      # does not exist.
+      - name: Validate the column registry
         working-directory: lib/db
-        run: npx prisma generate --schema schema/schema.db
-        env:
-          DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
+        run: node src/cli.js validate
 
       - name: Apply migrations (the deploy path does this too)
         working-directory: lib/db
-        run: npx prisma migrate deploy --schema schema/schema.db
+        run: node src/cli.js deploy
         env:
           DATABASE_URL: mysql://kosply:kosply@localhost:3306/kosply_test
 
-      # MariaDB grants MARIADB_USER only on MARIADB_DATABASE, so the shadow
-      # database cannot be created as kosply the way it could as a PostgreSQL
-      # superuser. Create it as root and hand it to the application role, which
-      # is what lib/db/docker/init.sh does locally. The root URL points at
-      # kosply_test rather than `mysql` because `prisma db execute` refuses to
-      # run against a system database.
-      - name: Create the shadow database used by the drift check
-        working-directory: lib/db
+      # MariaDB grants MARIADB_USER only on MARIADB_DATABASE, so the scratch
+      # database cannot be created as `kosply`. Create it as root and hand it to
+      # the application role, which is what lib/db/docker/init.sh does locally.
+      - name: Create the scratch database used by the drift check
         run: |
-          cat > /tmp/shadow.sql <<'SQL'
-          CREATE DATABASE IF NOT EXISTS kosply_shadow;
-          GRANT ALL PRIVILEGES ON kosply_shadow.* TO 'kosply'@'%';
-          SQL
-          npx prisma db execute --file /tmp/shadow.sql --schema schema/schema.db
-        env:
-          DATABASE_URL: mysql://root:kosply@localhost:3306/kosply_test
+          mariadb -h 127.0.0.1 -uroot -pkosply -e \
+            "CREATE DATABASE IF NOT EXISTS kosply_shadow;
+             GRANT ALL PRIVILEGES ON kosply_shadow.* TO 'kosply'@'%';"
 
-      # Deliberately the same helper `./scripts/db/db.sh drift` and
-      # `db.sh migrate <name>` use, rather than a copy of the command: the two
-      # answers cannot drift apart. The helper also normalises the datamodel's
-      # Json scalars, because MariaDB has no JSON type (it stores JSON as
-      # LONGTEXT, which is what Prisma introspects).
+      # Deliberately the same helper `./scripts/db/db.sh drift` uses, rather
+      # than a copy of the command: the two answers cannot drift apart. It
+      # replays the migrations into kosply_shadow and compares the result
+      # against lib/db/src/schema.js, in both directions.
       - name: Assert the schema matches the migration history (no drift)
         run: ./scripts/db/schema-diff.sh check
         env:
@@ -163,7 +156,8 @@ jobs:
           curl -sf http://localhost:3100/ | grep -q kosply-backend
           curl -sf http://localhost:3100/api/health | grep -q '"status":"ok"'
           # The old smoke test only hit dependency-free endpoints, so it passed
-          # with a completely dead database. This one proves Prisma is wired.
+          # with a completely dead database. This one proves the data layer is
+          # wired to a real MariaDB.
           curl -sf 'http://localhost:3100/api/models' | grep -q '"status":"ok"'
           # And that the internal API is not open.
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/api/internal/users/anyone)

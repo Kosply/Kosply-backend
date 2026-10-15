@@ -1,0 +1,14 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/auth/refresh'
+description: 'Exchange a refresh token for a new access token + refresh token (200). The presented token is consumed; replaying it is treated as theft and revokes the family.'
+order: 2200
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "refreshToken": "{{refreshToken}}"
+    }

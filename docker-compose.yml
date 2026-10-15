@@ -56,9 +56,12 @@ services:
   # `init.sh` creates `kosply_agent` EMPTY (deliberately: the agent gets its
   # own database and its own least-privilege role, so it cannot read
   # `kosply_main`). But the agent's ownership check queries `ai_conversations`,
-  # a Prisma model, so an unmigrated agent database made EVERY /ai/* route
-  # return 503 OwnershipCheckUnavailable while /health stayed green, and the
-  # server's `ai_conversations`/`ai_messages` rows were never written.
+  # so an unmigrated agent database made EVERY /ai/* route return 503
+  # OwnershipCheckUnavailable while /health stayed green, and the server's
+  # `ai_conversations`/`ai_messages` rows were never written.
+  #
+  # There is no code generation here: the migration runner is plain JavaScript
+  # in ./src, so the container only has to install mysql2 and run it.
   migrate-agent:
     image: node:22-bookworm-slim
     container_name: kosply-migrate-agent
@@ -69,13 +72,12 @@ services:
     environment:
       # Least-privilege role created by init.sh, not the superuser: it owns
       # ONLY the kosply_agent database, so a compromised agent cannot read
-      # kosply_main. (The pre-MariaDB compose connected as POSTGRES_USER
+      # kosply_main. (The pre-MariaDB compose connected as the superuser role
       # instead, which silently made the agent a superuser.)
       DATABASE_URL: mysql://kosply_agent:${AGENT_DB_PASSWORD:-kosply}@mariadb:3306/kosply_agent
     command: >
-      sh -c "npm install --no-audit --no-fund --loglevel=error prisma@6 @prisma/client@6 &&
-             npx prisma generate --schema schema/schema.db &&
-             npx prisma migrate deploy --schema schema/schema.db"
+      sh -c "npm ci --omit=dev --no-audit --no-fund --loglevel=error &&
+             node src/cli.js deploy"
     depends_on:
       mariadb:
         condition: service_healthy

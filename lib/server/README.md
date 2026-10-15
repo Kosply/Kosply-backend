@@ -16,10 +16,13 @@ lib/server/
   server.js             # entrypoint: bind port + graceful shutdown
   app.js                # Express setup (global middleware, route mount)
   config/env.js         # env loader (PORT, NODE_ENV, CORS_ORIGIN, JWT_*, AI_AGENT_URL)
-  config/db.js          # lazy Prisma access (null-safe, 503 when down)
+  config/db.js          # lazy database access (null-safe, 503 when down)
   routes/<domain>/      # index.js aggregator + one folder per domain
   controllers/<domain>/ # per-module logic (req/res)
-  services/<domain>/    # business logic (validation, Prisma, enforcement)
+  services/<domain>/    # business logic (validation, database access, enforcement)
+  services/auth/
+    auth.service.js     # register/login + mintAccessToken (the one JWT minter)
+    refresh.service.js  # issue / rotate / reuse detection / revoke
   middlewares/          # notFound (404), errorHandler (central), asyncHandler
   middlewares/auth/     # JWT authenticate + optionalAuthenticate + requireRole
   middlewares/internalKey.js   # x-internal-key guard for /api/internal/*
@@ -268,7 +271,7 @@ above says what exists, this says where the data lives.
 | `reports` | `/api/reports*` (file / list / review + enforcement) |
 | `notifications` + `notification_preferences` | `/api/notifications*` |
 | `password_resets` | `POST /api/auth/forgot-password`, `/api/auth/reset-password` |
-| `ai_conversations` + `ai_messages` | `GET /api/ai/conversations` (Prisma direct), `/api/ai/history/:id` (via the agent) |
+| `ai_conversations` + `ai_messages` | `GET /api/ai/conversations` (database direct), `/api/ai/history/:id` (via the agent) |
 | `ai_models` | `GET /api/models` + ADMIN CRUD |
 
 The agent reaches the server only over HTTP on `/api/internal/*`, never the

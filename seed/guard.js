@@ -3,7 +3,7 @@
  * @notice Refuses to write fixtures into anything that is not an explicit
  * @notice development/test database.
  * @dev Mirrors the guard in `lib/db/schema/seed.js`. That file is a
- * @dev self-running Prisma seed (`run()` executes on import), so its guard
+ * @dev self-running seed (`run()` executes on import), so its guard
  * @dev cannot be required without also firing the whole seed — this module
  * @dev keeps the same contract as a standalone, importable check.
  */

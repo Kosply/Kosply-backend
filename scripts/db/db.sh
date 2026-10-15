@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
 # @title Kosply database workflows (lib/db)
-# @notice Install, migrate, seed and inspect the Prisma schema and MariaDB.
+# @notice Install, migrate, seed and inspect the MariaDB schema.
 # @dev `migrate deploy` (not `migrate dev`) is what any shared environment uses:
 # @dev `migrate dev` can reset a database when it decides the schema drifted,
 # @dev which on staging or main is data loss. `dev` here is reserved for a local
 # @dev scratch database and says so.
-# @dev `migrate <name>` does not shell out to `prisma migrate dev` either: on
-# @dev MariaDB that creates and drops its own shadow database, which needs a
-# @dev global CREATE privilege the application role deliberately does not have.
-# @dev It uses the same explicit-shadow diff as CI (scripts/db/schema-diff.sh).
+# @dev Migrations are plain SQL applied by `lib/db/src/migrate.js`. There is no
+# @dev shadow database and no datamodel to diff against: `schema/migrations/*.sql`
+# @dev is the schema, and `lib/db/src/schema.js` describes the columns the app
+# @dev reads and writes. `schema-diff.sh` checks the two agree.
 #
 # Usage: ./scripts/db/db.sh <command> [args]
 #
@@ -26,21 +26,20 @@ usage() {
 Usage: ./scripts/db/db.sh <command>
 
 Setup
-  install          npm ci in lib/db, then generate the Prisma client
-  generate         Regenerate the Prisma client (run after editing schema.db)
+  install          npm ci in lib/db
+  generate         No-op: the data layer is plain JS, nothing is generated
 
 Schema
-  validate         Check schema.db without touching a database
-  migrate <name>   Create + apply a migration from schema.db (LOCAL ONLY)
+  validate         Check the column registry (tables, columns, relations)
+  migrate <name>   Create an empty migration file for you to fill in (LOCAL ONLY)
   deploy           Apply pending migrations (use this for staging/main)
   status           Show which migrations have been applied
   reset            Drop the schema and re-apply every migration (DESTRUCTIVE)
-  drift            Fail if the schema and the migrations disagree
-  format           Format schema.db
+  drift            Fail if the column registry and the migrations disagree
 
 Data
   seed             Insert demo users/products (refuses a production database)
-  studio           Open Prisma Studio
+  studio           Not available: use a MariaDB client instead
 
 Local database
   testdb           Create a throwaway database, migrate it, and print its URL
@@ -48,27 +47,24 @@ Local database
 EOF
 }
 
-# Run prisma from lib/db with the repository env loaded.
-# The schema lives at schema/schema.db (not Prisma's default prisma/schema.prisma),
-# so every invocation passes an explicit --schema.
-SCHEMA_FILE="$DB_DIR/schema/schema.db"
 MIGRATIONS_DIR="$DB_DIR/schema/migrations"
 
 schema_diff() {
   "$ROOT/scripts/db/schema-diff.sh" "$@"
 }
 
-prisma() {
-  ( cd "$DB_DIR" && npx --no-install prisma "$@" --schema "$SCHEMA_FILE" )
+# Every database command goes through the library's own runner, with the repo
+# env already loaded by `load_env` in main().
+db_migrate() {
+  ( cd "$DB_DIR" && node src/cli.js deploy )
 }
 
-# Prisma resolves the datasource block before it decides what the command
-# actually needs, so even `validate` (purely static) fails with P1012 when
-# DATABASE_URL is absent. Hand it a syntactically valid placeholder: it is
-# never used to reach a database.
-prisma_static() {
-  ( cd "$DB_DIR" && DATABASE_URL="${DATABASE_URL:-mysql://x:x@localhost:3306/x}" \
-      npx --no-install prisma "$@" --schema "$SCHEMA_FILE" )
+db_status() {
+  ( cd "$DB_DIR" && node src/cli.js status )
+}
+
+db_reset() {
+  ( cd "$DB_DIR" && node src/cli.js reset )
 }
 
 require_installed() {
@@ -85,26 +81,26 @@ cmd_install() {
   require_cmd npm
   log "Installing lib/db dependencies"
   ( cd "$DB_DIR" && npm ci )
-  cmd_generate
+  ok "lib/db ready"
 }
 
 cmd_generate() {
+  # There is no code generation: the data layer is plain JavaScript and the
+  # column registry is hand-written. Kept as a command so muscle memory, and any
+  # CI step that calls it, keep working.
   require_installed
-  log "Generating the Prisma client"
-  prisma generate
-  ok "client generated"
+  ( cd "$DB_DIR" && node src/cli.js validate )
+  ok "nothing to generate"
 }
 
 cmd_validate() {
   require_installed
-  log "Validating schema.db"
-  prisma_static validate
+  log "Checking the column registry"
+  ( cd "$DB_DIR" && node src/cli.js validate ) || die "column registry is inconsistent"
 }
 
 cmd_format() {
-  require_installed
-  log "Formatting schema.db"
-  prisma_static format
+  die "format: schema.db no longer exists. The SQL files are the schema; format them in your editor."
 }
 
 cmd_migrate() {
@@ -114,43 +110,36 @@ cmd_migrate() {
   [ -n "$name" ] || die "usage: $0 migrate <name>   (e.g. $0 migrate add_promo_codes)"
   warn "This applies migrations to the database in DATABASE_URL."
   warn "Use '$0 deploy' for staging or main."
-  # Not `prisma migrate dev`: on MariaDB it creates and drops its own shadow
-  # database (`prisma_migrate_shadow_db_<hash>`), which needs a global CREATE
-  # privilege the application role deliberately does not have (it is also a
-  # licence to drop kosply_main). The explicit-shadow workflow below is the same
-  # one CI runs, against the kosply_shadow database init.sh provisions.
-  local sql dir
-  sql="$(schema_diff script)" || die "could not diff the migrations against schema.db"
-  [ -n "$sql" ] || die "schema.db already matches the migrations: nothing to migrate"
+  # A migration here is a hand-written SQL file applied by our own runner. The
+  # old flow generated it by diffing a datamodel against a shadow database;
+  # with no datamodel there is nothing to diff, and writing the DDL directly is
+  # the honest workflow.
+  local dir
   dir="$MIGRATIONS_DIR/$(date -u +%Y%m%d%H%M%S)_$name"
   mkdir -p "$dir"
-  printf '%s\n' "$sql" > "$dir/migration.sql"
-  ok "created $(basename "$dir")"
-  log "Applying it"
-  prisma migrate deploy
-  # `migrate deploy` does not regenerate the client, and `migrate dev` used to.
-  cmd_generate
+  : > "$dir/migration.sql"
+  ok "created $(basename "$dir")/migration.sql — write the DDL, then: $0 deploy"
+  echo
+  echo "  $EDITOR $dir/migration.sql"
+  echo "  ./scripts/db/db.sh deploy"
+  echo
 }
 
 cmd_deploy() {
   require_installed
   require_db_url
   log "Applying pending migrations"
-  prisma migrate deploy
-  # The CHECK constraints live outside the migrations because they need the
-  # tables to exist first; checks.sql is written to be idempotent.
-  # `prisma db execute` reads DATABASE_URL itself, so this works with a MariaDB
-  # URL without needing a mysql/psql client on the host.
-  log "Applying data-integrity constraints"
-  prisma db execute --file "$DB_DIR/docker/checks.sql" \
-    || warn "checks.sql did not apply (the DSN is not understood?)"
+  # The runner also re-applies docker/checks.sql, which has to come after the
+  # DDL: the CHECK constraints reference columns that must exist first, and the
+  # file is idempotent so re-running it on every deploy is intended.
+  db_migrate
   ok "database is up to date"
 }
 
 cmd_status() {
   require_installed
   require_db_url
-  prisma migrate status
+  db_status
 }
 
 cmd_reset() {
@@ -163,21 +152,21 @@ cmd_reset() {
   local db_name; db_name="$(basename "${DATABASE_URL%%\?*}")"
   [ "$answer" = "$db_name" ] || die "aborted: '$answer' != '$db_name'"
   log "Resetting the schema"
-  prisma migrate reset --force --skip-seed
+  db_reset
   ok "schema reset"
 }
 
 cmd_drift() {
   require_installed
   require_db_url
-  # CI runs exactly this (scripts/db/schema-diff.sh check): a migration that
-  # does not reproduce the schema is a latent P2022 ("column does not exist")
-  # the first time it runs.
-  log "Checking for drift between the migrations and schema.db"
+  # CI runs exactly this (scripts/db/schema-diff.sh check). A column the app
+  # reads but no migration creates is a latent "column does not exist" the first
+  # time that code path runs in production.
+  log "Checking the column registry against the migrations"
   if schema_diff check; then
     ok "no drift"
   else
-    die "drift detected: the migrations do not produce schema.db"
+    die "drift detected: the migrations and the column registry disagree"
   fi
 }
 
@@ -190,10 +179,9 @@ cmd_seed() {
 }
 
 cmd_studio() {
-  require_installed
-  require_db_url
-  log "Opening Prisma Studio"
-  prisma studio
+  # Prisma Studio went with the ORM. There is no drop-in replacement: use a
+  # MariaDB client, or the admin dashboard routes this project already ships.
+  die "studio: Prisma Studio is gone. Use a MariaDB client, e.g. mariadb -h 127.0.0.1 -u kosply -p"
 }
 
 cmd_testdb() {
@@ -208,7 +196,7 @@ cmd_testdb() {
   local root_pw="${MARIADB_ROOT_PASSWORD:-}"
   docker exec kosply-mariadb mariadb -uroot ${root_pw:+-p"$root_pw"} -e "DROP DATABASE IF EXISTS \`$name\`" >/dev/null 2>&1 || true
   docker exec kosply-mariadb mariadb -uroot ${root_pw:+-p"$root_pw"} -e "CREATE DATABASE \`$name\`" >/dev/null
-  DATABASE_URL="$url" prisma migrate deploy
+  DATABASE_URL="$url" db_migrate
   ok "scratch database ready"
   echo
   echo "  DATABASE_URL=\"$url\""

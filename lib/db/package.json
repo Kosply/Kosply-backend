@@ -1,21 +1,19 @@
 {
   "name": "kosply-db",
   "version": "0.1.0",
-  "description": "Kosply DB - Prisma schema + client for MariaDB (User, SellerVerification, Product)",
+  "description": "Kosply DB - MariaDB schema, migrations and data layer for the marketplace",
   "scripts": {
-    "generate": "prisma generate --schema schema/schema.db",
-    "migrate:deploy": "prisma migrate deploy --schema schema/schema.db",
-    "studio": "prisma studio --schema schema/schema.db",
-    "validate": "prisma validate --schema schema/schema.db",
-    "format": "prisma format --schema schema/schema.db",
-    "seed": "node schema/seed.js"
+    "migrate:deploy": "node src/cli.js deploy",
+    "migrate:status": "node src/cli.js status",
+    "migrate:reset": "node src/cli.js reset",
+    "drift": "node ../scripts/db/schema-diff.sh check",
+    "validate": "node src/cli.js validate",
+    "seed": "node schema/seed.js",
+    "test": "node --test \"tests/**/*.test.js\""
   },
   "dependencies": {
-    "@prisma/client": "^6.13.0",
-    "bcryptjs": "^3.0.3"
-  },
-  "devDependencies": {
-    "prisma": "^6.13.0"
+    "bcryptjs": "^3.0.3",
+    "mysql2": "^3.15.4"
   },
   "engines": {
     "node": ">=18"

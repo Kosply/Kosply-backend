@@ -9,7 +9,7 @@ Agent statuses pass through untouched.
 | POST | `/api/ai/chat` | JWT | `conversation_id?`, `message`, `ui_state?` (screen snapshot) | agent body as-is + `callbacks[]` for Flutter | `401`, `503 AGENT_UNAVAILABLE` |
 | POST | `/api/ai/chat/stream` | JWT | same as chat | SSE piped (`token`/`thinking`/`callback`/`interrupt`/`done`) | `401`, `503 AGENT_UNAVAILABLE` |
 | POST | `/api/ai/chat/resume` | JWT | `conversation_id`, `approve` | agent body as-is | `401`, `503 AGENT_UNAVAILABLE` |
-| GET | `/api/ai/conversations` | JWT | — | `200 {items}` own sessions, newest first (Prisma direct, no agent hop) | `401`, `503 DB_UNAVAILABLE` |
+| GET | `/api/ai/conversations` | JWT | — | `200 {items}` own sessions, newest first (database direct, no agent hop) | `401`, `503 DB_UNAVAILABLE` |
 | GET | `/api/ai/wait/:id` | JWT | query `timeout` (1..1500, default 60) | agent body as-is: `{status: resolved\|timeout\|noop, answer, remainingS}` | `401`, `503 AGENT_UNAVAILABLE` |
 | GET | `/api/ai/history/:id` | JWT | — | agent body as-is | `401`, `503 AGENT_UNAVAILABLE` |
 

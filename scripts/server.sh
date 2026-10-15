@@ -4,7 +4,7 @@
 # @notice Starts, stops, restarts or shows staging/main through one script.
 # @dev Prefers the kosmon CLI when built (single logic source), otherwise
 # @dev talks to PM2 directly so no Go toolchain is needed to boot a server.
-# @dev Applies pending Prisma migrations before the first start/restart. A
+# @dev Applies pending migrations before the first start/restart. A
 # @dev deploy used to ship new code against an old schema, surfacing as
 # @dev "column does not exist" (P2022) on live traffic.
 # @dev Rebuilds a stale kosmon binary when a .go file is newer, so the launcher
@@ -33,7 +33,7 @@ usage() {
   echo
   echo "  ./scripts/server.sh staging           # start staging (:3001)"
   echo "  ./scripts/server.sh main restart      # restart main (:3000)"
-  echo "  ./scripts/server.sh dev               # foreground with --watch, no PM2"
+  echo "  ./scripts/server.sh dev               # foreground with --watch, :3500"
 }
 
 # Foreground development run. Kept here rather than in a new script so there is
@@ -42,8 +42,8 @@ usage() {
 if [ "$ENV_NAME" = "dev" ]; then
   [ "$ACTION" = "start" ] || { usage >&2; exit 1; }
   [ -d "$ROOT/node_modules" ] || { echo "[error] run: npm install" >&2; exit 1; }
-  echo "[dev] http://localhost:${PORT:-3000} (ctrl-c to stop)"
-  exec env PORT="${PORT:-3000}" NODE_ENV=development node --watch lib/server/server.js
+  echo "[dev] http://localhost:${PORT:-3500} (ctrl-c to stop)"
+  exec env PORT="${PORT:-3500}" NODE_ENV=development node --watch lib/server/server.js
 fi
 
 if [ "$ENV_NAME" = "-h" ] || [ "$ENV_NAME" = "--help" ] || [ "$ENV_NAME" = "help" ]; then
@@ -78,19 +78,16 @@ migrate() {
     return 0
   fi
   if [ ! -d "$ROOT/lib/db/node_modules" ]; then
-    echo "[error] lib/db dependencies are missing. Run: (cd lib/db && npm ci && npx prisma generate)"
+    echo "[error] lib/db dependencies are missing. Run: (cd lib/db && npm ci)"
     exit 1
   fi
   echo "[migrate] applying pending migrations to the ${ENV_NAME} database"
-  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma migrate deploy \
-      --schema schema/schema.db )
-  # The CHECK constraints can only be added once the tables exist, so they run
-  # after migrate and are written to be idempotent. `prisma db execute` reads
-  # DATABASE_URL itself, so no mysql/psql client is needed on the host.
-  echo "[migrate] applying data-integrity constraints"
-  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma db execute \
-      --file "$ROOT/lib/db/docker/checks.sql" --schema schema/schema.db ) || {
-    echo "[warn] could not apply checks.sql (the DSN is not understood?); continuing"
+  # The runner also re-applies docker/checks.sql: the CHECK constraints can only
+  # be added once the tables exist, so they run after the DDL, and the file is
+  # written to be idempotent.
+  ( cd "$ROOT/lib/db" && DATABASE_URL="$MIGRATE_URL" node src/cli.js deploy ) || {
+    echo "[error] migrations failed for ${ENV_NAME}; refusing to start"
+    exit 1
   }
 }
 

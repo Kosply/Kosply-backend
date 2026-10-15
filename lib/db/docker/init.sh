@@ -42,12 +42,10 @@ CREATE DATABASE IF NOT EXISTS kosply_dev;
 CREATE DATABASE IF NOT EXISTS kosply_staging;
 CREATE DATABASE IF NOT EXISTS kosply_main;
 CREATE DATABASE IF NOT EXISTS kosply_agent;
--- Shadow database for schema diffing (scripts/db/schema-diff.sh, and CI).
--- `prisma migrate dev` would create and drop `prisma_migrate_shadow_db_<hash>`
--- by itself, but that needs a global CREATE privilege, and granting the
--- application role global CREATE is a licence to drop kosply_main too. A
--- dedicated database, granted to the role, keeps `db.sh migrate` and `db.sh
--- drift` working without that.
+-- Scratch database for the drift gate (scripts/db/schema-diff.sh, and CI).
+-- It exists because the application role deliberately has no global CREATE
+-- privilege: granting it would be a licence to drop kosply_main too. A dedicated
+-- database, granted to the role, keeps `db.sh drift` working without that.
 CREATE DATABASE IF NOT EXISTS kosply_shadow;
 
 -- Application role: staging and main are separate databases under PM2, and

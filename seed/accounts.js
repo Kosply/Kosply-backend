@@ -31,16 +31,16 @@ const generatePassword = () => crypto.randomBytes(12).toString('base64url');
  * @notice Derive a unique username from the email local part.
  * @dev A hardcoded username previously aborted a re-seed on a unique violation,
  * @dev so the suffix search exists to keep the script re-runnable.
- * @param {import('@prisma/client').PrismaClient} prisma Prisma client singleton.
+ * @param {object} db Data layer.
  * @param {string} email Account email.
  * @returns {Promise<string>} A free username.
  */
-const uniqueUsername = async (prisma, email) => {
+const uniqueUsername = async (db, email) => {
   const base =
     (email.split('@')[0] || 'admin').replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 20) || 'admin';
   for (let i = 0; i < 5; i += 1) {
     const candidate = i === 0 ? base : `${base}${i}`;
-    const taken = await prisma.user.findUnique({ where: { username: candidate }, select: { id: true } });
+    const taken = await db.selectOne('users', { where: { username: candidate } });
     if (!taken) return candidate;
   }
   return `${base}-${crypto.randomBytes(3).toString('hex')}`;
@@ -63,10 +63,10 @@ const resolveSeedAdminEmail = () =>
  * @dev demo fixture, not the provisioning path (`POST /api/admin/users` still
  * @dev enforces the real policy), and refusing here would block short
  * @dev passwords developers deliberately use on throwaway databases.
- * @param {import('@prisma/client').PrismaClient} prisma Prisma client singleton.
+ * @param {object} db Data layer.
  * @returns {Promise<{ email: string, password: string, generated: boolean, userId: string, adminId: string }>} Account summary for the run report.
  */
-const seedAccounts = async (prisma) => {
+const seedAccounts = async (db) => {
   const email = resolveSeedAdminEmail();
   const name = (process.env.SEED_ADMIN_NAME || 'Ops Super Admin').trim();
   const provided = (process.env.SEED_ADMIN_PASSWORD || '').trim();
@@ -82,28 +82,18 @@ const seedAccounts = async (prisma) => {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  const existing = await prisma.user.findUnique({ where: { email }, select: { username: true } });
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: { passwordHash, name, role: 'SUPER_ADMIN', isActive: true },
-    create: {
+  const existing = await db.selectOne('users', { where: { email } });
+  const user = await db.upsert('users', {
       email,
-      username: existing ? existing.username : await uniqueUsername(prisma, email),
+      username: existing ? existing.username : await uniqueUsername(db, email),
       name,
       passwordHash,
       universitas: 'Kosply',
       programStudi: 'Ops',
       role: 'SUPER_ADMIN',
-    },
-    select: { id: true, email: true, username: true, role: true },
-  });
+    }, { where: { email }, update: { passwordHash, name, role: 'SUPER_ADMIN', isActive: true } });
 
-  const admin = await prisma.admin.upsert({
-    where: { email },
-    update: { passwordHash, name, isActive: true },
-    create: { email, name, passwordHash },
-    select: { id: true, email: true },
-  });
+  const admin = await db.upsert('admins', { email, name, passwordHash }, { where: { email }, update: { passwordHash, name, isActive: true } });
 
   return { email, password, generated, userId: user.id, adminId: admin.id };
 };

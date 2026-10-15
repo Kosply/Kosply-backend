@@ -5,16 +5,16 @@
  * @notice every dashboard surface (`dashboard.js`).
  * @dev Entry point: `./seed.sh [all|accounts|dashboard]` from the repository
  * @dev root. Running `node seed/index.js` directly also works — dotenv is
- * @dev loaded below BEFORE the Prisma client is constructed, because the client
- * @dev reads DATABASE_URL at import time.
+ * @dev loaded below BEFORE the data layer is required, because the pool
+ * @dev reads DATABASE_URL when it is first used.
  * @dev The production guard lives in `seed/guard.js`.
  */
 const path = require('node:path');
 
-// dotenv must run before anything that constructs the Prisma client.
+// dotenv must run before anything that opens the pool.
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const prisma = require('../lib/db/src/client');
+const db = require('../lib/db/src/db');
 const { assertDevDatabase } = require('./guard');
 const { seedAccounts, resolveSeedAdminEmail } = require('./accounts');
 const { seedDashboard } = require('./dashboard');
@@ -31,7 +31,7 @@ const MODES = ['all', 'accounts', 'dashboard'];
  */
 const resolveAdminUserId = async () => {
   const email = resolveSeedAdminEmail();
-  const admin = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const admin = await db.selectOne('users', { where: { email } });
   return admin?.id ?? null;
 };
 
@@ -55,7 +55,7 @@ const main = async () => {
 
   let adminUserId = null;
   if (mode === 'all' || mode === 'accounts') {
-    const account = await seedAccounts(prisma);
+    const account = await seedAccounts(db);
     adminUserId = account.userId;
     summary.accounts = 1;
     console.log(`[seed] operator account = ${account.email}`);
@@ -73,7 +73,7 @@ const main = async () => {
   }
 
   if (mode === 'all' || mode === 'dashboard') {
-    Object.assign(summary, await seedDashboard(prisma, { adminUserId }));
+    Object.assign(summary, await seedDashboard(db, { adminUserId }));
   }
 
   console.log('[seed] done:', JSON.stringify(summary));
@@ -84,4 +84,4 @@ main()
     console.error('[seed] failed:', error.message);
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => db.close());
