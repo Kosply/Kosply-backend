@@ -17,7 +17,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+
 
 
 def _payload(data: Any) -> str:
@@ -74,8 +74,7 @@ def split_thinking(chunk: Any) -> tuple:
 
 
 async def stream_chat_events(
-    graph: Any, *, message: str, user_id: str, conversation_id: str,
-    role: str = "UNKNOWN", ui_state: dict | None = None,
+    graph: Any, turn: dict, *, conversation_id: str,
     recursion_limit: int = 40,
 ) -> AsyncIterator[dict]:
     """Yield SSE-ready dicts for EventSourceResponse.
@@ -92,11 +91,11 @@ async def stream_chat_events(
         "recursion_limit": recursion_limit,
     }
     agen = graph.astream(
-        {"messages": [HumanMessage(content=message)], "user_id": user_id,
-         "user_role": role, "ui_state": ui_state or {}},
+        turn,
         config,
         stream_mode=["messages", "updates"],
     )
+    listing = None
     try:
         async for mode, chunk in agen:
             if mode == "messages":
@@ -116,6 +115,9 @@ async def stream_chat_events(
                     return
                 for callback in _updates_callbacks(chunk):
                     yield {"event": "callback", "data": _payload(callback)}
+                for update in chunk.values():
+                    if isinstance(update, dict) and isinstance(update.get("listing_card"), dict):
+                        listing = update["listing_card"]
     except asyncio.CancelledError:
         # Client went away mid-stream. Close the upstream generator explicitly
         # so the graph run stops and its in-flight slot is released; relying on
@@ -132,7 +134,10 @@ async def stream_chat_events(
         # hangs on a truncated stream - the exact failure this module exists to
         # prevent. Cleanup must never be able to eat the terminal event.
         await _safe_aclose(agen)
-    yield {"event": "done", "data": _payload({"ok": True})}
+    done = {"ok": True}
+    if listing:
+        done["listing"] = listing
+    yield {"event": "done", "data": _payload(done)}
 
 
 async def _safe_aclose(agen) -> None:

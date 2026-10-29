@@ -13,12 +13,19 @@ under `thread_id` (= conversation id) and can be resumed later.
 """
 
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import RemoveMessage, ToolMessage
+from langchain_core.messages import AIMessage, RemoveMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Command, interrupt
 
+from .listing.card import (
+    LISTING_PROMPT,
+    ListingCardError,
+    assemble_listing_card,
+    cap_image_urls,
+    message_text,
+)
 from .memory import needs_compaction, summarize_history
 from .state import AgentState
 from .tools import SENSITIVE_TOOLS, TOOLS
@@ -35,12 +42,24 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
     per-request as ModelError instead of crashing the process.
     Compaction budgets bound history size for small-window models.
     """
-    bound = {"llm": llm.bind_tools(TOOLS) if llm is not None else None}
+    bound = {
+        "llm": llm.bind_tools(TOOLS) if llm is not None else None,
+        # Listing calls the unbound model so a photo turn cannot emit a tool
+        # call. Tests pass one fake; bind_tools returns that same object.
+        "raw": llm,
+    }
 
     def _llm():
         if bound["llm"] is None:
-            bound["llm"] = init_chat_model(model_name).bind_tools(TOOLS)
+            raw = init_chat_model(model_name)
+            bound["raw"] = raw
+            bound["llm"] = raw.bind_tools(TOOLS)
         return bound["llm"]
+
+    def _raw():
+        if bound["raw"] is None:
+            _llm()
+        return bound["raw"]
 
     async def agent(state: AgentState) -> dict:
         """LLM node: compact when over budget, then answer or emit tool calls."""
@@ -56,6 +75,44 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
             return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), summary, *kept, response]}
         response = await _llm().ainvoke(ensure_system_prompt(messages, role))
         return {"messages": [response]}
+
+    async def listing(state: AgentState) -> dict:
+        """One card from the side photos. Price and stock stay unset."""
+        photos = cap_image_urls(state.get("image_urls") or [])
+        response = await _raw().ainvoke(
+            [SystemMessage(content=LISTING_PROMPT), *state["messages"]]
+        )
+        try:
+            card = assemble_listing_card(photos, message_text(response.content))
+        except ListingCardError as exc:
+            raise ListingCardError("listing card is empty") from exc
+        summary = f"{card['title']}\n\n{card['description']}"
+        return {
+            "messages": [AIMessage(content=summary)],
+            "listing_card": card,
+            "listing_mode": "chat",
+            "image_urls": [],
+        }
+
+    def listing_price(state: AgentState) -> dict:
+        """Write the user's price and stock onto the card the photos already filled."""
+        previous = state.get("listing_card") or {}
+        card = assemble_listing_card(
+            previous.get("imageUrls") or [],
+            None,
+            price=state.get("listing_price"),
+            stock=state.get("listing_stock"),
+            previous=previous,
+        )
+        answer = (
+            f"Harga Rp{card['price']} dan stok {card['stock']} dicatat. "
+            "Judul, deskripsi, dan kategori tetap dari foto."
+        )
+        return {
+            "messages": [AIMessage(content=answer)],
+            "listing_card": card,
+            "listing_mode": "chat",
+        }
 
     def human_approval(state: AgentState) -> Command:
         """Gate sensitive tools behind `interrupt()`; plain tools pass through."""
@@ -83,13 +140,33 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
             },
         )
 
+    def route_turn(state: AgentState) -> str:
+        """Listing only when this turn carries side photos or a price and stock.
+
+        A text turn leaves `listing_mode` unset and stays on the chatbot node.
+        """
+        mode = state.get("listing_mode") or "chat"
+        if mode == "photos" and (state.get("image_urls") or []):
+            return "listing"
+        if mode == "price" and state.get("listing_card"):
+            return "listing_price"
+        return "agent"
+
     builder = StateGraph(AgentState)
     builder.add_node("agent", agent)
+    builder.add_node("listing", listing)
+    builder.add_node("listing_price", listing_price)
     builder.add_node("human_approval", human_approval)
     # Catch-all tool errors: a failing tool becomes an error ToolMessage the
     # agent can explain, never a crashed turn. (Default only catches ToolException.)
     builder.add_node("tools", ToolNode(TOOLS, handle_tool_errors=True))
-    builder.add_edge(START, "agent")
+    builder.add_conditional_edges(
+        START,
+        route_turn,
+        {"listing": "listing", "listing_price": "listing_price", "agent": "agent"},
+    )
+    builder.add_edge("listing", END)
+    builder.add_edge("listing_price", END)
     builder.add_conditional_edges("agent", tools_condition, {"tools": "human_approval", END: END})
     builder.add_edge("tools", "agent")
     return builder.compile(checkpointer=checkpointer)

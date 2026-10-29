@@ -101,11 +101,20 @@ async def append_message(
 
 
 async def load_history(conversation_id: str) -> list:
-    """Load stored rows as [{role, content}] (roles: human/ai/system). Empty when off."""
+    """Load stored rows as [{role, content}] (roles: human/ai/system). Empty when off.
+
+    A refused or missing database is the same as "off": the history route then
+    falls back to the checkpointer. `sync_turn` already treats that failure as
+    non-fatal; this read used to 500 instead.
+    """
     if not settings.database_url:
         return []
     back = {"USER": "human", "ASSISTANT": "ai", "SYSTEM": "system"}
-    conn = await _connect()
+    try:
+        conn = await _connect()
+    except Exception as exc:
+        logger.warning("history read skipped: %s", exc)
+        return []
     try:
         async with conn.cursor() as cur:
             await cur.execute(

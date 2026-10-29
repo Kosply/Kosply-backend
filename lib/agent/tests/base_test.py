@@ -85,6 +85,8 @@ class BaseAgentTest(unittest.IsolatedAsyncioTestCase):
         fake = StatefulFakeChatModel(
             responses=list(responses if responses is not None else self.RESPONSES)
         )
+        # Listing tests assert the photos reached this same fake.
+        self.fake_model = fake
         return build_graph(InMemorySaver(), llm=fake)
 
     def _config(self, thread=None) -> dict:

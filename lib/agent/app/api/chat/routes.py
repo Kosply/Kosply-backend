@@ -4,12 +4,12 @@ import asyncio
 import json
 
 from fastapi import APIRouter, Depends, Request
-from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.memory import sync_turn
-from app.agent.policy import check_user_message, reply_for
+from app.agent.policy import reply_for
+from app.api.chat.turn import graph_input, listing_from_result, listing_mode_of, precheck
 from app.api.shared import (
     _extract_callbacks,
     _final_answer,
@@ -30,27 +30,23 @@ from .streaming import stream_chat_events
 router = APIRouter(dependencies=[Depends(require_internal_key)])
 
 
-@router.post("/ai/chat", response_model=ChatResponse)
+@router.post("/ai/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     """One chat turn (non-streaming). 409 when a tool needs approval."""
     await assert_thread_ownership(request.app, req.conversation_id, req.user_id)
     req.check_ui_state()
-    verdict = check_user_message(req.message)
-    if not verdict.allowed:
+    verdict = precheck(req)
+    if verdict is not None:
         reply = reply_for(verdict.reason)
         await sync_turn(req.conversation_id, req.user_id, req.message, reply)
         return ChatResponse(conversation_id=req.conversation_id, answer=reply)
     graph = request.app.state.graph
+    turn = graph_input(req)
     try:
         result = await run_guarded(
             request.app.state.inflight,
             lambda: graph.ainvoke(
-                {
-                    "messages": [HumanMessage(content=req.message)],
-                    "user_id": req.user_id,
-                    "user_role": req.role,
-                    "ui_state": req.ui_state or {},
-                },
+                turn,
                 _thread(req.conversation_id, recursion_limit=settings.recursion_limit),
             ),
             queue_timeout_s=settings.queue_timeout_s,
@@ -67,6 +63,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
         conversation_id=req.conversation_id,
         answer=answer,
         callbacks=_extract_callbacks(result),
+        listing=listing_from_result(listing_mode_of(req), result),
     )
 
 
@@ -75,8 +72,8 @@ async def chat_stream(req: ChatRequest, request: Request) -> EventSourceResponse
     """One chat turn as SSE (`token` / `thinking` / `callback` / `interrupt` / `done`)."""
     await assert_thread_ownership(request.app, req.conversation_id, req.user_id)
     req.check_ui_state()
-    verdict = check_user_message(req.message)
-    if not verdict.allowed:
+    verdict = precheck(req)
+    if verdict is not None:
         reply = reply_for(verdict.reason)
         await sync_turn(req.conversation_id, req.user_id, req.message, reply)
 
@@ -92,11 +89,8 @@ async def chat_stream(req: ChatRequest, request: Request) -> EventSourceResponse
             request.app.state.inflight,
             stream_chat_events(
                 graph,
-                message=req.message,
-                user_id=req.user_id,
+                graph_input(req),
                 conversation_id=req.conversation_id,
-                role=req.role,
-                ui_state=req.ui_state,
                 recursion_limit=settings.recursion_limit,
             ),
             queue_timeout_s=settings.queue_timeout_s,

@@ -14,3 +14,10 @@ class AgentState(MessagesState, total=False):
     user_id: str
     user_role: str
     ui_state: dict
+    # "chat" keeps the existing agent. "photos" fills one listing card.
+    # "price" writes the user's price and stock onto that card.
+    listing_mode: str
+    image_urls: list
+    listing_price: int
+    listing_stock: int
+    listing_card: dict
