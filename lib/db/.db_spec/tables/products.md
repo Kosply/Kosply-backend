@@ -39,3 +39,4 @@ The second-hand catalog. Seller = a `users` row with an approved, active verific
 
 - `events`: one row here relates to a row in `product_events`, matched on `product_events.productId` = `products.id` (declared in `src/schema.js`)
 - `conversations`: one row here relates to a row in `conversations`, matched on `conversations.productId` = `products.id` (declared in `src/schema.js`)
+- `favorites`: one row here relates to a row in `favorites`, matched on `favorites.productId` = `products.id` (declared in `src/schema.js`)

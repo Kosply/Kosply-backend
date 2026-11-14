@@ -4,6 +4,7 @@
 
 | Method | Path | Auth | Body / Query | Success | Errors |
 |---|---|---|---|---|---|
+| GET | `/api/support/help-topics` | none | — | `200 {items}` active FAQ, `sortOrder` first | — |
 | POST | `/api/support/tickets` | JWT | `category` (default LAINNYA), `subject`, `description` | `201` (`ticketNo KSP-…`) | `400 VALIDATION` |
 | GET | `/api/support/tickets` | JWT | `status?`, `category?` (ADMIN filters; users see own) | `200 {items}` | `401` |
 | GET | `/api/support/tickets/:id` | JWT owner/ADMIN | — | `200` + messages | `404 TICKET_NOT_FOUND` |

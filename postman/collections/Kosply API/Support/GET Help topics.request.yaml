@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/support/help-topics'
+description: 'Public FAQ for the Help desk, smallest sortOrder first. No auth.'
+order: 5950
+headers: []

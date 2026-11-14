@@ -41,7 +41,8 @@ func Registry() []Endpoint {
 		{Method: "GET", Path: "/api/health", Description: "Service health (uptime, timestamp)"},
 
 		// Public catalog.
-		{Method: "GET", Path: "/api/products", Description: "Public catalog (q?, limit?)"},
+		{Method: "GET", Path: "/api/products", Description: "Public catalog (q?, limit?, sellerId?)"},
+		{Method: "GET", Path: "/api/support/help-topics", Description: "Public Help desk FAQ"},
 		{Method: "GET", Path: "/api/models", Description: "Active AI models (public)"},
 		{Method: "GET", Path: "/api/users/:id", Description: "Public profile (needs a real id)"},
 		{Method: "GET", Path: "/api/analytics/seller", Description: "Seller catalog analytics (needs JWT: 401 here)"},
@@ -49,6 +50,7 @@ func Registry() []Endpoint {
 
 		// Authenticated reads.
 		{Method: "GET", Path: "/api/users/me", Description: "Own profile (needs JWT: 401 here)"},
+		{Method: "GET", Path: "/api/favorites", Description: "Saved listings (needs JWT)"},
 		{Method: "GET", Path: "/api/notifications", Description: "Own notification inbox (needs JWT)"},
 		{Method: "GET", Path: "/api/notifications/preferences", Description: "Notification toggles (needs JWT)"},
 		{Method: "GET", Path: "/api/conversations", Description: "COD inbox (needs JWT)"},

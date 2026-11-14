@@ -57,6 +57,8 @@ All files use NatSpec-style docblocks (`@title`, `@notice`, `@dev`,
 | `PORT` | no | `3000` | `3001` | `3000` |
 | `TRUST_PROXY_HOPS` | no | `0` | behind the LB | behind the LB |
 | `CORS_ORIGIN` | no | `*` | real origin | real origin |
+| `UPLOAD_DIR` | no | `<repo>/uploads` | shared storage | shared storage |
+| `PUBLIC_BASE_URL` | no | request origin | public API origin | public API origin |
 
 Resolution order: PM2 `env` → `.env` file → defaults in `config/env.js`
 (dotenv never overrides existing variables, so PM2 always wins).
@@ -99,8 +101,9 @@ npm start               # single instance on :3000
 - `POST /api/auth/login` → email + password login, `{ user, token }`
 - `POST /api/auth/google` → direct Google (`idToken`), `{ user, token, onboardingRequired, isNew }`
 - `POST /api/auth/apple` → direct Apple (`identityToken` + names), same shape — **disabled by default** (`APPLE_LOGIN_ENABLED=true` when iOS ships; needs paid Apple Developer)
-- `GET /api/products` → public catalog (`q?`, `limit?`)
+- `GET /api/products` → public catalog (`q?`, `limit?`, `sellerId?`); each card carries `seller.id` + `seller.photo`
 - `GET /api/products/:id` → public detail
+- `POST /api/uploads/images` → raw image body (JWT) → `{ item: { url } }`, served under `/uploads` (see `postman/specs/tables/uploads.md`)
 - `POST /api/products` → seller create (JWT + role SELLER)
 - `PATCH /api/products/:id` → owner or ADMIN update
 - `DELETE /api/products/:id` → soft archive (owner or ADMIN)
@@ -109,7 +112,7 @@ npm start               # single instance on :3000
 ## Analytics (seller catalog numbers)
 
 - `POST /api/analytics/products/:id/event?type=IMPRESSION|CLICK&source=feed|search|share|detail` → record an event (public; optional JWT attributes the viewer)
-- `GET /api/analytics/seller?days=1..365` → per-product rows + catalog totals (JWT, own catalog only)
+- `GET /api/analytics/seller?days=1..365` → per-product rows + catalog totals (JWT, own catalog only); `favorites` is the current save count (not windowed: an unsave deletes the row)
 - `GET /api/analytics/products/:id?days=1..365` → one product (owner or ADMIN)
 
 Metrics per product: `impressions`, `clicks`, `clickThroughRate` (clicks /
