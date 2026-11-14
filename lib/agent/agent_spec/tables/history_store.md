@@ -8,7 +8,7 @@ reads from them first.
 |---|---|
 | `ensure_conversation(id, user_id, title)` | `INSERT IGNORE …` into `ai_conversations` (title = first message, truncated) |
 | `append_message(id, role, content, model?)` | one `ai_messages` row + bumps `lastMessageAt`; tool rows skipped |
-| `load_history(id)` | `ai_messages` ordered by `createdAt` → `[{role, content}]` (roles back-mapped to human/ai/system) |
+| `load_history(id)` | `ai_messages` ordered by `createdAt` → `[{role, content}]` (roles back-mapped to human/ai/system). A refused connection returns `[]` so the route can fall back to the checkpointer |
 | `sync_turn(id, user_id, message, answer)` | ensure + user row + assistant row; warns and continues on failure |
 
 ## Wiring
@@ -17,7 +17,7 @@ reads from them first.
 |---|---|
 | `POST /ai/chat` | after a clean turn: user message + answer |
 | `POST /ai/chat/resume` | answer only (user side already stored) |
-| `GET /ai/history/:id` | shared tables first; checkpointer snapshot fallback |
+| `GET /ai/history/:id` | shared tables first; checkpointer snapshot fallback when the table is empty or MariaDB refuses the connection |
 
 ## Role mapping
 

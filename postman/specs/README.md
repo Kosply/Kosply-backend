@@ -11,9 +11,11 @@ covered by `npm test` (live parts skip without `DATABASE_URL`).
 | Health | `tables/health.md` | none |
 | Auth | `tables/auth.md` | mixed (see file) |
 | Products | `tables/products.md` | reads public, writes JWT |
+| Favorites | `tables/favorites.md` | JWT (saved listings) |
+| Uploads | `tables/uploads.md` | JWT (image bytes → URL) |
 | Verifications | `tables/verifications.md` | JWT (list/review ADMIN) |
 | Conversations (COD) | `tables/conversations.md` | JWT, member-scoped |
-| Support | `tables/support.md` | JWT (filters ADMIN) |
+| Support | `tables/support.md` | FAQ public, tickets JWT (filters ADMIN) |
 | Reports | `tables/reports.md` | JWT (list/review ADMIN) |
 | Users | `tables/users.md` | JWT self, public read |
 | Notifications | `tables/notifications.md` | JWT owner-scoped |

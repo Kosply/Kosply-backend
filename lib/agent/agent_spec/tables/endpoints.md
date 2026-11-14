@@ -8,8 +8,8 @@ aggregate in `app/api/__init__.py`. Graph instance comes from
 |---|---|---|---|---|
 | GET | `/` | — | `200 {name, status}` | load-balancer check |
 | GET | `/health` | — | `200 {status, service}` | liveness probe |
-| POST | `/ai/chat` | `{conversation_id, user_id, message}` | `200 {conversation_id, answer}` | `409 needs_approval` when a sensitive tool fires |
-| POST | `/ai/chat/stream` | same as `/ai/chat` | SSE `token` / `interrupt` / `done` | stream ends right after `interrupt` |
+| POST | `/ai/chat` | `{conversation_id, user_id, message, imageUrls?, price?, stock?}` | `200 {conversation_id, answer, listing?}` | `409 needs_approval` when a sensitive tool fires. `listing` is the product card and is omitted on a text turn (see `listing.md`) |
+| POST | `/ai/chat/stream` | same as `/ai/chat` | SSE `token` / `interrupt` / `done` | stream ends right after `interrupt`; a listing turn adds `listing` on `done` |
 | POST | `/ai/chat/resume` | `{conversation_id, approve}` | `200 {conversation_id, answer}` | `approve=true` runs the tool, `false` cancels it; `409` again if another interrupt fires |
 | GET | `/ai/wait/:conversation_id` | query `timeout` (1..1500, default 60) | `200 {conversation_id, status, answer, remainingS}` | long-poll until the approval resolves: `resolved` / `timeout` / `noop` (see `human_in_the_loop.md`) |
 | GET | `/ai/history/:id` | — | `200 {conversation_id, messages[{role, content}]}` | resume rendering in Flutter |

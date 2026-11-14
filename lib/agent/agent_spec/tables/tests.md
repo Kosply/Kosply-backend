@@ -18,6 +18,9 @@ folder per category; shared kit stays at `tests/base_test.py`.
 | `tests/api/test_api.py` | chat approval → resume | `POST /ai/chat` → `409`, `POST /ai/chat/resume` → `200` answer |
 | `tests/api/test_api.py` | stream | SSE body contains `done` |
 | `tests/api/test_api.py` | history | after one turn, roles include `human` + `ai` |
+| `tests/api/test_listing.py` | text turn | a chatbot turn returns a non-empty answer and no `listing` card |
+| `tests/api/test_listing.py` | photos then price | 3 side-photo URLs (together longer than 4000 characters) become one card; the fake model input contains those URLs; model price/stock are ignored; the next turn's integers keep the AI text |
+| `tests/listing/test_listing_card.py` | card contract | AI text fills title/description/category; user price and stock keep that text; 8 photos fit; a 9th is not stored; lengths clip to the product limits; bool and float prices are rejected |
 | `tests/api/test_wait.py` | wait resolve/timeout/noop | approval landing mid-wait returns `resolved` + `remainingS>0` + answer; no approval → `timeout` with `remainingS 0`; fresh thread → `noop` fast; route returns `noop` over HTTP |
 | `tests/memory/test_history_store.py` | role mapping, off-mode | `AiMessageRole` mapping; silent no-op without `DATABASE_URL` |
 | `tests/policy/test_policy.py` | injections rejected | 12 EN+ID samples refused with reason |

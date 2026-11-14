@@ -26,6 +26,7 @@ from .listing.card import (
     cap_image_urls,
     message_text,
 )
+from .listing.photos import inline_own_uploads
 from .memory import needs_compaction, summarize_history
 from .state import AgentState
 from .tools import SENSITIVE_TOOLS, TOOLS
@@ -79,8 +80,12 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
     async def listing(state: AgentState) -> dict:
         """One card from the side photos. Price and stock stay unset."""
         photos = cap_image_urls(state.get("image_urls") or [])
+        # Photos on the Kosply server travel as bytes, not URLs: a hosted model
+        # cannot reach the LAN address a phone uploads to in development. The
+        # checkpoint keeps the URLs; only this model call carries the bytes.
+        history = await inline_own_uploads(state["messages"])
         response = await _raw().ainvoke(
-            [SystemMessage(content=LISTING_PROMPT), *state["messages"]]
+            [SystemMessage(content=LISTING_PROMPT), *history]
         )
         try:
             card = assemble_listing_card(photos, message_text(response.content))

@@ -7,7 +7,9 @@ so every turn is persisted and resumable.
 
 | Node | Type | Does |
 |---|---|---|
-| `agent` | async LLM node | calls the bound model on `state["messages"]`, returns the response (answer or tool calls) |
+| `agent` | async LLM node | chatbot path: calls the bound model on `state["messages"]`, returns the response (answer or tool calls) |
+| `listing` | async LLM node | photo path: unbound model sees the side photos and returns one product card. No tools. See `listing.md` |
+| `listing_price` | plain node | writes the user's `price` and `stock` onto the card already in state. Does not call the model |
 | `human_approval` | gate node | plain tools → `Command(goto="tools")`; sensitive tools → `interrupt()` → approve goes to `tools`, reject appends `ToolMessage("User rejected…")` and goes back to `agent` |
 | `tools` | `ToolNode(TOOLS)` | executes approved/plain tool calls, returns `ToolMessage`s |
 
@@ -15,7 +17,9 @@ so every turn is persisted and resumable.
 
 | From | Via | To |
 |---|---|---|
-| `START` | edge | `agent` |
+| `START` | `route_turn` | `listing` (`photos`) / `listing_price` (`price` and a card exists) / `agent` (text) |
+| `listing` | edge | `END` |
+| `listing_price` | edge | `END` |
 | `agent` | `tools_condition` | `human_approval` (tools) / `END` (plain answer) |
 | `human_approval` | `Command` | `tools` / `agent` |
 | `tools` | edge | `agent` |
@@ -41,3 +45,10 @@ so every turn is persisted and resumable.
 |---|---|---|
 | `messages` | `Messages` (inherited) | full turn history, reducer-appended |
 | `user_id` | `str` | passthrough for future per-user policy |
+| `user_role` | `str` | persona role (`SELLER` / `BUYER` / other) |
+| `ui_state` | `dict` | Flutter screen snapshot |
+| `listing_mode` | `str` | `chat` / `photos` / `price` for this turn |
+| `image_urls` | `list` | side-photo URLs for a `photos` turn (empty otherwise) |
+| `listing_price` | `int` | user rupiah price on a `price` turn |
+| `listing_stock` | `int` | user quantity on a `price` turn (`products.stock`) |
+| `listing_card` | `dict` | draft card kept on the thread until the user sets price and stock |

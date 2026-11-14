@@ -15,6 +15,7 @@ everything below exists in code, compiles, and is covered by `pytest tests/`
 | History-store (agent ↔ db mirror) | `tables/history_store.md` | implemented |
 | Policy (injection + scope hardening) | `tables/policy.md` | implemented |
 | Personas (seller/buyer modes) | `tables/personas.md` | implemented |
+| Listing (side photos → product card) | `tables/listing.md` | implemented |
 | Compaction (small-window models) | `tables/compaction.md` | implemented |
 | Models registry (provider facts) | `tables/models.md` | implemented |
 | UI bridge (read screen, callbacks) | `tables/ui_tools.md` | implemented |

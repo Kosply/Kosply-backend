@@ -8,7 +8,7 @@ File: `app/api/chat/streaming.py`. One graph run, two stream modes multiplexed:
 | `token` | `{"text": "..."}` | each LLM answer chunk |
 | `thinking` | `{"text": "..."}` | each reasoning-model thinking chunk (render collapsed/hidden) |
 | `interrupt` | `{"pending": [...]}` | graph paused for approval — client must call `POST /ai/chat/resume`; stream ends here |
-| `done` | `{"ok": true}` | turn finished without interrupt |
+| `done` | `{"ok": true, "listing"?}` | turn finished without interrupt. `listing` is present only when this turn produced a product card |
 
 ## Thinking split (`split_thinking`)
 
