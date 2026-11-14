@@ -34,3 +34,6 @@ lib/server-monitoring/kosmon
 
 # Local Postman collections can embed live tokens
 postman/*.local.json
+
+# Uploaded images (POST /api/uploads/images); user content, never committed
+/uploads/
