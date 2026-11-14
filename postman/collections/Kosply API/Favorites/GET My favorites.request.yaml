@@ -1,0 +1,6 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/favorites'
+description: 'Saved listings, newest save first, seller attached (JWT).'
+order: 3600
+headers: []

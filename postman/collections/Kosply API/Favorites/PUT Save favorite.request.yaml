@@ -1,0 +1,6 @@
+$kind: http-request
+method: PUT
+url: '{{baseUrl}}/api/favorites/{{productId}}'
+description: 'Save a product (idempotent, JWT). 404 for unknown or archived products.'
+order: 3610
+headers: []

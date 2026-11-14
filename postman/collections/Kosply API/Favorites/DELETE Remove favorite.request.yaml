@@ -1,0 +1,6 @@
+$kind: http-request
+method: DELETE
+url: '{{baseUrl}}/api/favorites/{{productId}}'
+description: 'Unsave a product (idempotent, JWT).'
+order: 3620
+headers: []

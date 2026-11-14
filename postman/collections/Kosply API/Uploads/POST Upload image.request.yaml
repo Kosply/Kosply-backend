@@ -1,0 +1,8 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/uploads/images'
+description: 'Raw image body (image/jpeg, image/png or image/webp, max 8 MB, JWT). Returns {item: {url, contentType, size}}.'
+order: 3150
+headers:
+  - key: Content-Type
+    value: image/jpeg
