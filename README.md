@@ -24,7 +24,8 @@ Kosply-backend/
   ecosystem.config.js       # PM2: kosply-server-staging + kosply-server-main
   docker-compose.yml        # MariaDB + agent (+ one-shot agent migration)
   package.json
-  .env.example
+  .env.example              # local dev values, ready to copy
+  .env.full.example         # every variable, with defaults and reasons
   seed.sh                   # dashboard demo seed — fills a dev db (seed/README.md)
   seed/                     # fixtures for every dashboard surface
     accounts.js             #   login-able operator account (placeholders, env-driven)
@@ -99,9 +100,15 @@ cd kosply-backend
 cp .env.example .env
 ```
 
-Fill in at least `DATABASE_URL`, `JWT_SECRET`, `INTERNAL_API_KEY` and the
-`MARIADB_*` bootstrap values. `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` /
-`SEED_ADMIN_NAME` are optional and only used by the demo seed in step 5.
+`.env.example` already holds the values the docker compose MariaDB expects, so
+local development runs without editing it. Google login and mail stay off
+until you fill in `GOOGLE_CLIENT_IDS` and the `GMAIL_*` values; the links to
+set them up are in the file.
+
+`.env.full.example` documents every other variable (production secrets,
+staging, AI agent, uploads, bootstrap admins). `SEED_ADMIN_EMAIL` /
+`SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` live there; they are optional and
+only used by the demo seed in step 5.
 
 ### 3. Start the database (Docker)
 
