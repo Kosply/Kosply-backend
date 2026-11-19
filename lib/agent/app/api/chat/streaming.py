@@ -17,6 +17,8 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
+from app.agent.navigation import TurnNavigation
+
 
 
 
@@ -41,6 +43,21 @@ def _split_block(block: Any) -> tuple:
     if block.get("type") == "text":
         return "", block.get("text") or ""
     return "", ""
+
+
+# Tool results, the system prompt, and the user's own turn are not the reply.
+# Callbacks already travel on their own SSE event.
+_HIDDEN_MESSAGE_TYPES = frozenset({"tool", "system", "human", "function"})
+
+
+def answer_parts(chunk: Any) -> tuple | None:
+    """Visible thinking and answer for one streamed message.
+
+    @return None when the message must not appear in the conversation.
+    """
+    if getattr(chunk, "type", "") in _HIDDEN_MESSAGE_TYPES:
+        return None
+    return split_thinking(chunk)
 
 
 def split_thinking(chunk: Any) -> tuple:
@@ -90,6 +107,20 @@ async def stream_chat_events(
         # a GraphRecursionError surfaced as a 500 with the raw message.
         "recursion_limit": recursion_limit,
     }
+    nav = TurnNavigation()
+    sent = set()
+
+    def fresh(callbacks: list) -> list:
+        """Drop screen moves this stream already emitted."""
+        kept = []
+        for item in callbacks:
+            key = (item.get("callback"), json.dumps(item.get("args") or {}, sort_keys=True))
+            if key in sent:
+                continue
+            sent.add(key)
+            kept.append(item)
+        return kept
+
     agen = graph.astream(
         turn,
         config,
@@ -100,7 +131,10 @@ async def stream_chat_events(
         async for mode, chunk in agen:
             if mode == "messages":
                 token, _meta = chunk
-                thinking, text = split_thinking(token)
+                parts = answer_parts(token)
+                if parts is None:
+                    continue
+                thinking, text = parts
                 if thinking:
                     yield {"event": "thinking", "data": _payload({"text": thinking})}
                 if text:
@@ -108,11 +142,16 @@ async def stream_chat_events(
             elif mode == "updates" and isinstance(chunk, dict):
                 if "__interrupt__" in chunk:
                     pending = [getattr(i, "value", None) for i in chunk["__interrupt__"]]
+                    # Open the product and the chat before the preview is asked.
+                    # The message itself stays unsent until resume(approve).
+                    for callback in fresh(nav.callbacks(pending)):
+                        yield {"event": "callback", "data": _payload(callback)}
                     yield {"event": "interrupt", "data": _payload({"pending": pending})}
                     # The approval is a terminal state for this request, not a
                     # failure: `interrupt` already told the client what to do.
                     yield {"event": "done", "data": _payload({"ok": True, "awaitingApproval": True})}
                     return
+                nav.note_updates(chunk)
                 for callback in _updates_callbacks(chunk):
                     yield {"event": "callback", "data": _payload(callback)}
                 for update in chunk.values():
@@ -134,6 +173,8 @@ async def stream_chat_events(
         # hangs on a truncated stream - the exact failure this module exists to
         # prevent. Cleanup must never be able to eat the terminal event.
         await _safe_aclose(agen)
+    for callback in fresh(nav.callbacks()):
+        yield {"event": "callback", "data": _payload(callback)}
     done = {"ok": True}
     if listing:
         done["listing"] = listing

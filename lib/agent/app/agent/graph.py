@@ -33,6 +33,18 @@ from .tools import SENSITIVE_TOOLS, TOOLS
 from app.agent.policy import ensure_system_prompt
 
 
+def _has_images(messages) -> bool:
+    """True when a message carries an image block the model should actually see."""
+    for message in messages:
+        content = getattr(message, "content", None)
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "image_url":
+                return True
+    return False
+
+
 def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
                 *, compaction_max_messages: int = 30, compaction_threshold_pct: float = 75.0,
                 compaction_context_total: int = 32000, compaction_keep_recent: int = 6):
@@ -62,6 +74,12 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
             _llm()
         return bound["raw"]
 
+    async def _for_model(messages):
+        """Copy sent to the model. Upload URLs become bytes; the checkpoint keeps the URLs."""
+        if not _has_images(messages):
+            return messages
+        return await inline_own_uploads(messages)
+
     async def agent(state: AgentState) -> dict:
         """LLM node: compact when over budget, then answer or emit tool calls."""
         role = state.get("user_role", "UNKNOWN")
@@ -72,9 +90,11 @@ def build_graph(checkpointer: object, model_name: str = "", llm: object = None,
             cutoff = max(len(messages) - compaction_keep_recent, 0)
             summary = await summarize_history(messages[:cutoff] or messages, _llm())
             kept = messages[cutoff:]
-            response = await _llm().ainvoke(ensure_system_prompt([summary, *kept], role))
+            visible = await _for_model([summary, *kept])
+            response = await _llm().ainvoke(ensure_system_prompt(visible, role))
             return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), summary, *kept, response]}
-        response = await _llm().ainvoke(ensure_system_prompt(messages, role))
+        visible = await _for_model(messages)
+        response = await _llm().ainvoke(ensure_system_prompt(visible, role))
         return {"messages": [response]}
 
     async def listing(state: AgentState) -> dict:

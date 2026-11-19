@@ -55,3 +55,8 @@ class UiRouteTest(BaseAgentTest):
                 body = (await res.aread()).decode()
         self.assertIn("event: callback", body)
         self.assertIn("apply_filter", body)
+        blocks = body.replace("\r\n", "\n").split("\n\n")
+        tokens = [block for block in blocks if block.startswith("event: token")]
+        self.assertTrue(any("difilter ya" in block for block in tokens))
+        for block in tokens:
+            self.assertNotIn("callback", block)

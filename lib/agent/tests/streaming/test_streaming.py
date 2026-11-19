@@ -1,10 +1,10 @@
 """Thinking-stream tests: reasoning chunks ride a separate SSE event."""
 
 from httpx import ASGITransport, AsyncClient
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, SystemMessage, ToolMessage
 
 from tests.client import agent_headers
-from app.api.chat.streaming import split_thinking
+from app.api.chat.streaming import answer_parts, split_thinking
 from app.main import app
 from tests.base_test import BaseAgentTest, StatefulFakeChatModel
 from langchain_core.messages import AIMessage
@@ -35,6 +35,17 @@ class SplitThinkingTest(BaseAgentTest):
             ]
         )
         self.assertEqual(split_thinking(chunk), ("mikir", "jawab"))
+
+    def test_tool_and_system_messages_are_not_replies(self):
+        """Callback payloads and the system prompt stay out of the conversation."""
+        tool = ToolMessage(
+            content='{"callback": "apply_filter", "args": {"q": "kipas"}}',
+            tool_call_id="call-1",
+        )
+        system = SystemMessage(content="You are the Kosply assistant.")
+        self.assertIsNone(answer_parts(tool))
+        self.assertIsNone(answer_parts(system))
+        self.assertEqual(answer_parts(AIMessageChunk(content="halo")), ("", "halo"))
 
 
 class ThinkingStreamTest(BaseAgentTest):

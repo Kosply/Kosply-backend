@@ -76,7 +76,7 @@ class SystemPromptProductKnowledgeTest(unittest.TestCase):
         self.assertIn("category", low)
 
     def test_names_the_sensitive_tools(self):
-        for name in ("request_seller_contact", "send_chat_message"):
+        for name in ("request_seller_contact", "send_chat_message", "fill_product_form", "go_to_screen"):
             self.assertIn(name, SYSTEM_PROMPT)
         self.assertIn("approval", SYSTEM_PROMPT.lower())
 

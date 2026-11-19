@@ -17,7 +17,10 @@ def request_seller_contact(
     message: str,
     state: Annotated[dict, InjectedState()],
 ) -> str:
-    """Ask a seller to contact you about a product. Requires user approval."""
+    """Open the product chat and send this message as the buyer.
+
+    Requires user approval. The message is stored in the seller's chat room.
+    """
     buyer_id = (state or {}).get("user_id", "")
     try:
         resp = server_post(

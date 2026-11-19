@@ -3,6 +3,7 @@
 import asyncio
 import json
 import time
+from typing import Any
 
 from app.core.errors import ApprovalRequired
 from app.core.errors.errors import AgentError
@@ -88,27 +89,70 @@ def _thread(conversation_id: str, *, recursion_limit: int | None = None) -> dict
     return config
 
 
+def visible_text(content: Any) -> str:
+    """Text a student can read. Tool-call blocks are not part of the reply."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") in ("text", "output_text"):
+                parts.append(str(block.get("text") or ""))
+        return "".join(parts)
+    return ""
+
+
 def _final_answer(result: dict) -> str:
     """Extract the last assistant text from an invoke result."""
     for msg in reversed(result.get("messages", [])):
-        if getattr(msg, "type", "") == "ai" and getattr(msg, "content", ""):
-            content = msg.content
-            return content if isinstance(content, str) else str(content)
+        if getattr(msg, "type", "") != "ai":
+            continue
+        text = visible_text(getattr(msg, "content", "")).strip()
+        if text:
+            return text
     return ""
 
 
 def _extract_callbacks(result: dict) -> list:
-    """Collect perform_callback payloads from a finished turn for Flutter."""
+    """Collect screen actions Flutter should run after this turn.
+
+    `perform_callback` is the model's own request. Catalog and detail tools
+    also open the product they picked, so a search moves the screen without
+    a second tool call.
+    """
+    from app.agent.navigation import TurnNavigation
+
     callbacks = []
+    seen = set()
+    nav = TurnNavigation()
+
+    def add(name: str, args: dict) -> None:
+        key = (name, json.dumps(args, sort_keys=True, default=str))
+        if not name or key in seen:
+            return
+        seen.add(key)
+        callbacks.append({"callback": name, "args": args})
+
     for msg in result.get("messages", []):
-        if getattr(msg, "type", "") != "tool" or getattr(msg, "name", "") != "perform_callback":
+        if getattr(msg, "type", "") != "tool":
             continue
-        try:
-            payload = json.loads(msg.content) if isinstance(msg.content, str) else {}
-        except (ValueError, TypeError):
-            continue
-        if isinstance(payload, dict) and payload.get("callback"):
-            callbacks.append({"callback": payload["callback"], "args": payload.get("args", {})})
+        name = getattr(msg, "name", "")
+        nav.note_message(name, getattr(msg, "content", ""))
+        payload = {}
+        content = getattr(msg, "content", "")
+        if isinstance(content, str):
+            try:
+                payload = json.loads(content)
+            except (ValueError, TypeError):
+                payload = {}
+        elif isinstance(content, dict):
+            payload = content
+        if name == "perform_callback" and isinstance(payload, dict) and payload.get("callback"):
+            add(str(payload["callback"]), payload.get("args") or {})
+    for item in nav.callbacks():
+        add(item["callback"], item["args"])
     return callbacks
 
 
@@ -156,9 +200,11 @@ async def _wait_for_resolution(graph, conversation_id: str, timeout_s: float) ->
             continue
         messages = (getattr(snapshot, "values", None) or {}).get("messages", []) or []
         for msg in reversed(messages):
-            if getattr(msg, "type", "") == "ai" and getattr(msg, "content", ""):
-                content = msg.content
-                answer = content if isinstance(content, str) else str(content)
+            if getattr(msg, "type", "") != "ai":
+                continue
+            text = visible_text(getattr(msg, "content", "")).strip()
+            if text:
+                answer = text
                 break
         if answer or time.monotonic() >= deadline:
             status = "resolved" if answer else "timeout"

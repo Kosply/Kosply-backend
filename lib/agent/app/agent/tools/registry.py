@@ -3,14 +3,21 @@
 from .catalog.catalog import get_product_detail, search_catalog
 from .chat.chat import read_conversation, send_chat_message
 from .contact.contact import request_seller_contact
+from .listing.form import fill_product_form
 from .roles.roles import get_user_role
-from .ui.ui import perform_callback, read_ui_state
+from .ui.ui import go_to_screen, perform_callback, read_ui_state
 
 TOOLS = [search_catalog, get_product_detail, request_seller_contact,
-         get_user_role, read_ui_state, perform_callback,
-         read_conversation, send_chat_message]
+         get_user_role, read_ui_state, perform_callback, go_to_screen,
+         read_conversation, send_chat_message, fill_product_form]
 
-SENSITIVE_TOOLS = {"request_seller_contact", "send_chat_message"}
+# fill_product_form does not write the server. It pauses so the phone can
+# preview the form and write it only after the student approves.
+SENSITIVE_TOOLS = {
+    "request_seller_contact",
+    "send_chat_message",
+    "fill_product_form",
+}
 
 __all__ = [
     "SENSITIVE_TOOLS",

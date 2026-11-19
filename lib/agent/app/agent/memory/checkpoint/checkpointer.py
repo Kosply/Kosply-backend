@@ -16,6 +16,30 @@ from app.core.errors import MemoryError
 CloseSaver = Callable[..., Awaitable[None]]
 
 
+def _repair_aiomysql_bytes_escape() -> None:
+    """Keep checkpoint blobs writable on the PyMySQL that aiomysql 0.3.2 ships with.
+
+    PyMySQL 1.2.3 turned ``escape_bytes_prefixed`` into the sentinel string
+    ``"DO NOT IMPORT THIS!!!"``. aiomysql 0.3.2 still calls that name for a
+    ``bytes`` parameter. LangGraph writes each checkpoint as bytes, so every
+    photo turn died with ``'str' object is not callable`` after the model had
+    already answered. aiomysql 0.3.3 (not released yet) inlines this same hex
+    escape. Drop the repair once that release is installed.
+    """
+    import aiomysql.connection as connection
+
+    if callable(getattr(connection, "escape_bytes_prefixed", None)):
+        return
+
+    def escape_bytes(value: bytes) -> str:
+        return "_binary X'%s'" % value.hex()
+
+    connection.escape_bytes_prefixed = escape_bytes
+
+
+_repair_aiomysql_bytes_escape()
+
+
 async def _noop_close(*_args: Any) -> None:
     """Closer for savers that hold no connection."""
     return None

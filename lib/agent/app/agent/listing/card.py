@@ -10,7 +10,8 @@ Limits are the ones a later product write can actually store:
 - `title` VARCHAR(191) in the init migration (the service allows 200, which
   does not fit the column, so the card uses 191)
 - `description` 20000 (product write; the column is TEXT)
-- `category` 100, free text, not an enum (product write; the column is wider)
+- `category` 100. The prompt asks for one seeded name. The assembler
+  still accepts any non-empty string; the product write checks the catalog.
 - `imageUrls` at most 8 (product write). A 9th photo is dropped, not stored.
 - `price` integer rupiah, 0 .. 2_000_000_000
 - `stock` integer, 0 .. int4 max
@@ -30,13 +31,20 @@ MAX_PRICE_RP = 2_000_000_000
 INT4_MAX = 2_147_483_647
 
 # Read by the model, not shown to the user. English matches the other prompts.
-LISTING_PROMPT = """You fill one Kosply product card from photos of a single item for sale.
-The photos are different sides of that one item. Reply with one JSON object and nothing else:
+LISTING_PROMPT = """You fill one Kosply product card from photos of a single second-hand item.
+The photos are different sides of that one item. The seller wrote the caption. It has two lines:
+Nama barang: the name the seller chose
+Kondisi barang: what the seller says about wear, flaws, and what is missing
+A later line may say Daftar kategori: followed by the only category names you may use.
+Reply with one JSON object and nothing else:
 {"title":"...","description":"...","category":"..."}
 Rules:
 - title, description, and category are required and must be non-empty.
-- category is free text a seller would type, such as "Elektronik" or "Peralatan Kos". It is not a fixed list.
-- Describe only what the photos show. When the caption has a language, use that language.
+- title is the seller's Nama barang, trimmed, at most 80 characters. Do not rename it, translate it, or add words.
+- description is Indonesian sales text for a second-hand item. Write exactly two paragraphs, separated by one blank line. The whole description is 80 to 140 words.
+- Paragraph one says what the item is, then color, material, shape, and any logo or printed words you can actually read. Do not judge the condition there.
+- Paragraph two is the condition, and only the condition. It starts with "Kondisi:". Quality and flaws are one account, not two sections. The seller's Kondisi barang is that whole account. Write what is still good and what is lacking together, in the seller's words, and add a flaw that is clearly visible in the photos. Do not use the headings "Kualitas" or "Kekurangan". Do not invent a flaw, a size, a price, or a history the seller and the photos do not show. If the seller says the item is fine and the photos show no flaw, say the condition is utuh and mention only what is actually in the frame.
+- category is exactly one name from the Daftar kategori line. If that line is missing or none of the names fit, use "Lainnya".
 - Do not include price, stock, or quantity. The seller types those.
 - Do not include location, status, or a seller id.
 """

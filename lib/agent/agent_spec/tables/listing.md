@@ -3,8 +3,8 @@
 Photo listing mode beside the chatbot. The phone takes side photos, uploads
 them the same way a product already does (this server has no camera and no
 binary upload), then hands the resulting `http(s)` URLs to one chat turn.
-The model fills one product card. The seller types only the price and the
-quantity.
+The model fills one product card. The seller types the item name and the
+condition before that turn, then the price and the quantity after it.
 
 Files: `app/agent/listing/card.py` (pure card), `app/api/chat/turn.py`
 (shared by JSON and SSE), `app/agent/graph.py` (`listing` and `listing_price`
@@ -46,9 +46,9 @@ The SSE `done` event carries the same object when this turn produced one.
 
 | Field | Who fills it | Limit |
 |---|---|---|
-| `title` | model | 191 characters (`products.title` is `VARCHAR(191)`) |
-| `description` | model | 20000 characters |
-| `category` | model, free text, not an enum | 100 characters |
+| `title` | model, echoing the seller's `Nama barang` | 191 characters (`products.title` is `VARCHAR(191)`) |
+| `description` | model. What the item is, then one `Kondisi:` paragraph from the seller's condition | 20000 characters |
+| `category` | model, exactly one name from the caption's `Daftar kategori` line, else `Lainnya` | 100 characters |
 | `imageUrls` | the uploaded URLs, cover is `[0]` | 8 |
 | `price` | the user, on the follow-up turn | integer rupiah, or `null` |
 | `stock` | the user, on the follow-up turn | integer, or `null` |
