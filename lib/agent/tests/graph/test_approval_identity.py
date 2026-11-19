@@ -44,7 +44,10 @@ class ApprovalIdentityTest(BaseAgentTest):
     def test_write_tools_are_all_gated(self):
         # Anything that changes state on the server must be behind approval, or
         # the gate is decorative.
-        self.assertEqual(SENSITIVE_TOOLS, {"request_seller_contact", "send_chat_message"})
+        self.assertEqual(
+            SENSITIVE_TOOLS,
+            {"request_seller_contact", "send_chat_message", "fill_product_form"},
+        )
 
     async def test_approved_send_acts_as_the_session_user(self):
         graph = self.make_graph([SEND_CALL, canned_answer("terkirim")])

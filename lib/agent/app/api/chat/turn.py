@@ -28,8 +28,13 @@ def precheck(req: ChatRequest):
 
 
 def listing_mode_of(req: ChatRequest) -> str:
-    """Select the graph branch for this turn. Photos win over price."""
-    if req.image_urls:
+    """Select the graph branch for this turn.
+
+    A listing-card turn still wins when photos arrive without `see_photos`.
+    `see_photos` keeps the chatbot and only attaches the pictures, so a seller
+    can ask the assistant to look at the item and talk.
+    """
+    if req.image_urls and not req.see_photos:
         return "photos"
     if req.price is not None and req.stock is not None:
         return "price"
@@ -40,7 +45,11 @@ def graph_input(req: ChatRequest) -> dict:
     """State delta for one invoke. Mode is always set, so a prior turn cannot stick."""
     mode = listing_mode_of(req)
     text = (req.message or "").strip()
-    if mode == "photos":
+    # Chat vision stays on the agent node. The listing node is the only reader
+    # of state image_urls, so those stay empty here and the pictures ride on
+    # the human message instead.
+    see = bool(req.image_urls) and (mode == "photos" or req.see_photos)
+    if see:
         human = HumanMessage(content=listing_message_content(text, req.image_urls))
     else:
         human = HumanMessage(content=text or "Harga dan stok.")

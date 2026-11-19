@@ -47,6 +47,9 @@ class ChatRequest(BaseModel):
     # Side photos of one item. The phone sends `imageUrls` (the products
     # column) after it uploads. Capped at 8; a 9th is dropped.
     image_urls: list[str] = Field(default_factory=list)
+    # When true, photos stay on the chatbot turn so the model can see them
+    # and still call tools. Absent means the old listing-card branch.
+    see_photos: bool = False
     price: int | None = Field(
         default=None,
         description="User-supplied rupiah price. The model never fills this.",

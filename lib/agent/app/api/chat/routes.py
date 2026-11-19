@@ -29,6 +29,18 @@ from .streaming import stream_chat_events
 # completely unauthenticated while published on 0.0.0.0:8000.
 router = APIRouter(dependencies=[Depends(require_internal_key)])
 
+# A photo card on this gateway can run past two minutes. The chatbot budget
+# stays at AI_MODEL_TIMEOUT_S. This one stays under the Node proxy (180s)
+# and the phone client (190s).
+_LISTING_TIMEOUT_S = 170.0
+
+
+def _run_timeout(req: ChatRequest) -> float:
+    """Budget for one turn. Photo cards get the longer listing budget."""
+    if req.image_urls:
+        return max(settings.model_timeout_s, _LISTING_TIMEOUT_S)
+    return settings.model_timeout_s
+
 
 @router.post("/ai/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
@@ -50,7 +62,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
                 _thread(req.conversation_id, recursion_limit=settings.recursion_limit),
             ),
             queue_timeout_s=settings.queue_timeout_s,
-            run_timeout_s=settings.model_timeout_s,
+            run_timeout_s=_run_timeout(req),
         )
     except AgentError:
         raise

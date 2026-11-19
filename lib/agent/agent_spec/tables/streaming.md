@@ -26,3 +26,4 @@ File: `app/api/chat/streaming.py`. One graph run, two stream modes multiplexed:
 | Transport | SSE via `EventSourceResponse` (`POST /ai/chat/stream`) |
 | Serialization | payloads pre-serialized with `json.dumps` (safe across `sse-starlette` versions) |
 | Empty chunks | non-string / empty token chunks are skipped |
+| Hidden messages | `tool`, `system`, and `human` messages are not `token` or `thinking` events. Callbacks stay on the `callback` event |

@@ -15,6 +15,24 @@ from typing import Annotated
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
+#: Names `go_to_screen` accepts. The phone's open_screen switch uses the value.
+_SCREENS = {
+    "home": "home",
+    "beranda": "home",
+    "search": "search",
+    "cari": "search",
+    "pencarian": "search",
+    "jual": "jual",
+    "inbox": "inbox",
+    "profile": "profile",
+    "profil": "profile",
+    "settings": "profile",
+    "favorite": "favorite",
+    "favorit": "favorite",
+    "help": "help",
+    "bantuan": "help",
+}
+
 #: Callbacks Flutter implements. Unknown names are refused (ask the user).
 SAFE_CALLBACKS = frozenset({
     "open_product",
@@ -68,3 +86,19 @@ def perform_callback(callback: str, params: dict | None = None) -> str:
         return ("Unknown callback. Tell the user which safe action you need "
                 "(open_product, apply_filter, open_chat, ...) and ask them to confirm.")
     return json.dumps({"callback": name, "args": params or {}}, ensure_ascii=False)
+
+
+@tool
+def go_to_screen(screen: str) -> str:
+    """Move the app to a screen the student named.
+
+    Use this when they ask to open or switch to a screen. Do not use it to
+    find an item: that is search_catalog, and the app opens the product.
+    screen is one of home, search, jual, inbox, profile, favorite, help.
+    The app performs the move. Do not describe the taps.
+    """
+    key = str(screen or "").strip().lower()
+    resolved = _SCREENS.get(key)
+    if not resolved:
+        return json.dumps({"status": "unknown", "screen": key}, ensure_ascii=False)
+    return json.dumps({"status": "ok", "screen": resolved}, ensure_ascii=False)
